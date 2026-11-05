@@ -1,12 +1,16 @@
 # Despliegue
 
-> **Histórico — plan de despliegue superado.** Este documento describe el
-> despliegue en un equipo Linux (Ubuntu Desktop/Linux Mint) con Chromium
-> en modo kiosco. Ese plan quedó reemplazado por la app de escritorio
-> nativa para Windows (WSL2 + Docker Engine + Electron) — ver
-> [Despliegue en Windows](../infra/windows/README.md) y el checklist
-> vigente en [windows-production-checklist.md](windows-production-checklist.md).
-> Se conserva este documento como registro histórico.
+> **Histórico de LICS — no es el despliegue de SIGEDA.** Documento
+> heredado de **LICS v2.5.0** (Alejandro Arias Rojas, con su
+> autorización). Describe el despliegue en un equipo Linux (Ubuntu
+> Desktop/Linux Mint) con Chromium en modo kiosco, un plan que el propio
+> LICS reemplazó después por la app de escritorio nativa para Windows
+> (WSL2 + Docker Engine + Electron, conservada en `infra/windows/` como
+> referencia). El despliegue de producción de **SIGEDA** sigue sin
+> decidirse (laptop local de la ASADA o una máquina virtual Linux en
+> Azure, según CLAUDE.md) — ver el README, sección "Pendientes
+> principales". Se conserva este documento, con su `/opt/lics` y demás
+> nombres tal cual, como registro histórico y por crédito a LICS.
 
 > Estado actualizado: la instalación offline base y el backend operativo inicial ya fueron validados. Las validaciones finales pendientes corresponden principalmente al entorno gráfico objetivo, hardening, soporte técnico y operación con usuarios reales.
 

@@ -1,5 +1,15 @@
 # Seguridad
 
+Documento heredado de **LICS v2.5.0** (Alejandro Arias Rojas, con su
+autorización), adaptado para **SIGEDA**. Los principios, el manejo de
+secretos y la red son los mismos; la sección de control de acceso se
+reescribió porque SIGEDA ya no usa el sistema de roles por módulo de
+negocio de LICS (se retiró al construir SIGEDA — ver
+[CLAUDE.md](../CLAUDE.md)). La sección "Seguridad en Windows" describe
+el despliegue de LICS tal cual sigue en el repositorio
+(`infra/windows/`), conservado como referencia: todavía no es el
+despliegue de SIGEDA, que sigue sin decidirse.
+
 ## Principios
 
 - mínimo privilegio;
@@ -27,76 +37,49 @@ Solamente Nginx debe publicar un puerto hacia el anfitrión.
 
 PostgreSQL, Django y Next.js deben permanecer dentro de la red interna de Docker.
 
-## Control de acceso por roles (RBAC)
+## Control de acceso
 
-El modelo de autorización actual es central para la seguridad de la aplicación y se implementa en
-`backend/src/apps/core/permissions.py`, reflejado en el frontend por
-`frontend/src/features/auth/permissions.ts`.
+SIGEDA tiene dos sistemas de autenticación separados en el mismo backend, que no se mezclan:
 
-### Roles fijos
+### Cuentas de SIGEDA (RF-01, RNF-09)
 
-Existen 5 roles fijos, implementados como grupos de Django (ver
-`backend/src/apps/core/management/commands/setup_roles.py`):
+El modelo real de SIGEDA (`apps/accounts/models.py:Cuenta`, tabla `cuenta` del Modelo ER v1.1),
+con su propia autenticación por token (`apps/accounts/sigeda_auth.py`,
+`apps/accounts/sigeda_views.py`) y sus endpoints bajo `/api/sigeda/auth/`.
 
-- `ADMIN`
-- `INVENTORY`
-- `SALES`
-- `CUSTOMERS`
-- `READ_ONLY`
+- **RN-09: dos cuentas con los mismos permisos** (`secretaria` y `administracion`, `cuenta.perfil`
+  `SECRETARIA`/`ADMINISTRADORA`). No hay roles ni permisos diferenciados: cualquier cuenta
+  autenticada puede hacer lo mismo. La única excepción propuesta y todavía sin confirmar con la
+  administradora es que solo `ADMINISTRADORA` pueda autorizar una restauración de respaldo
+  (Incremento 3, sin construir todavía).
+- **Bloqueo tras intentos fallidos (RNF-09):** 5 intentos incorrectos bloquean la cuenta 5 minutos
+  (`cuenta.intentos_fallidos`, `cuenta.bloqueada_hasta`), implementado en `LoginCuentaView`.
+- **Contraseñas:** mínimo 8 caracteres. `cuenta.es_contrasena_temporal` fuerza el cambio al entrar
+  (RF-20); todavía falta la pantalla que lo exige en el frontend (Incremento 2).
+- **Cierre de sesión por inactividad (15 min, RNF-09):** sin construir todavía; queda para el
+  Incremento 2, como control de frontend (la tabla `cuenta` no tiene una columna de "última
+  actividad": ver CLAUDE.md, sección 5).
 
-`ADMIN` recibe todos los permisos de módulo existentes y además tiene bypass de código en
-`ModulePermission` (junto con los superusuarios). El resto de los roles reciben únicamente los
-permisos de módulo (`view_<módulo>` / `add_<módulo>` / `change_<módulo>` / `cancel_<módulo>`)
-listados explícitamente en `ROLE_PERMISSIONS`. Desde la 2.4.0 (puntos 4, 13, 14 y 25 de la
-auditoría de 30 mejoras):
+### Administración genérica heredada de LICS
 
-| Rol | Puede | No tiene |
-|---|---|---|
-| `INVENTORY` (Inventario) | Productos y ubicaciones (ver, crear, editar), etiquetas y proformas. Lee clientes para la proforma. | Compras, proveedores, conteos, movimientos, reportes, caja. Ningún costo: ve solo el precio de venta. |
-| `SALES` (Ventas) | Ventas (crear, confirmar, anular) y proformas con cantidades. Lee productos y clientes para armar la venta, sin esos módulos en su menú, y crea un cliente desde la venta o la proforma (`add_customers`, sin editar clientes). | Costos, compras, reportes, caja. |
-| `CUSTOMERS` (Clientes y servicio) | Clientes, inyectores y servicios: recibir, iniciar, marcar listo, anular. Lee productos para los accesorios. | Poner el precio o el tipo de servicio, entregar, ver el precio, el método de pago, el importe de los accesorios o la factura: eso es solo del Administrador. |
-| `READ_ONLY` (Solo lectura) | Ver productos, ubicaciones, proveedores, compras, conteos, ventas, clientes, inyectores, servicios y documentos. | Escribir en cualquier módulo. Sin `view_costs`: no ve costos en las pantallas de producto (sí dentro de una compra, donde el costo es el dato principal). |
+Lo que queda de LICS tras retirar sus apps de negocio (`/login`, `/account`,
+`/system/status`, autenticación por `django.contrib.auth.User` y
+`rest_framework.authtoken`, endpoints bajo `/api/accounts/`): sirve para administrar el
+Django de base (por ejemplo, crear un superusuario con `createsuperuser` y usar `/admin/`
+o `/api/system/status/`), no para el dominio de SIGEDA.
 
-Reglas que no dependen de un permiso de módulo:
-
-- **`view_costs`** (casilla "Puede ver costos" en Usuarios) es un permiso aparte de los roles:
-  sin él no se ven costos ni el precio sugerido, no se cambia el precio de venta de un producto
-  (`validate_custom_sale_price`) y no se pide el resumen ni el cálculo de costos de una compra
-  (`ViewCostsRequired`).
-- **Precio y entrega de servicios** son solo del grupo `ADMIN` (`ModuleAdminRequired` /
-  `is_module_admin`), también la factura del servicio.
-- **`view_reports`**, **`view_movements`**, el módulo de **caja** (`view_cash` / `add_cash`) y
-  el de **traslados** a otra sede (`view/add/change/cancel_transfers`) son exclusivos de `ADMIN`:
-  ningún otro rol los incluye.
-- **Contraseñas:** mínimo 8 caracteres. Cada usuario cambia la suya en "Mi cuenta" (no cierra la
-  sesión: devuelve un token nuevo) y el Administrador puede restablecer la de otros desde Usuarios.
-
-### Dos tipos de permiso a nivel de código
-
-- `AdministrationPermission`: controla quién puede administrar usuarios. Permite el acceso a
+- `AdministrationPermission` (`backend/src/apps/core/permissions.py`): permite el acceso a
   superusuarios, usuarios `is_staff` o miembros del grupo `ADMIN`.
-- `ModulePermission` (con una subclase por módulo: `ProductsPermission`, `LocationsPermission`,
-  `SuppliersPermission`, `PurchasesPermission`, `InventoryCountsPermission`, `SalesPermission`,
-  `CustomersPermission`, `InjectorsPermission`, `ServicesPermission`, `ReportsPermission`,
-  `DocumentsPermission`, `MovementsPermission`): controla el acceso a los módulos de negocio.
-  Resuelve el permiso Django exacto según la acción del ViewSet y el método HTTP: las acciones en
-  `cancel_actions` exigen `cancel_<módulo>`, las acciones de solo lectura implementadas con un
-  método HTTP no seguro (`read_actions`, ej. `labels`) exigen `view_<módulo>`, `create` exige
-  `add_<módulo>`, los métodos seguros (GET/HEAD/OPTIONS) exigen `view_<módulo>`, y cualquier otro
-  caso (update, destroy, o acciones que mutan estado sin ser cancelación como `confirm`,
-  `approve`, `start`, `mark_ready`, `deliver`, `calculate_costs`) exige `change_<módulo>`.
+- **El sistema de permisos por módulo de negocio de LICS (`ModulePermission` y sus
+  subclases, `ModulePermissions`, la administración de usuarios con permisos
+  individuales) se retiró por completo al construir SIGEDA**, porque dependía de módulos
+  que ya no existen (inventario, ventas, caja, clientes). `is_staff` solo controla el
+  acceso al panel `/admin/` de Django; ya no hay permisos de módulo que otorgar.
+- `setup_roles` sigue creando los 5 grupos de Django que traía LICS (`ADMIN`, `INVENTORY`,
+  `SALES`, `CUSTOMERS`, `READ_ONLY`) porque el código genérico de administración de usuarios
+  los sigue nombrando, pero ya no tienen ningún permiso de módulo asociado.
 
-A diferencia del esquema anterior a esta migración de permisos, `is_staff` por sí solo **ya no**
-da acceso a los módulos de negocio: solo controla el acceso al panel `/admin/` de Django.
-
-### Espejo en el frontend
-
-`frontend/src/features/auth/permissions.ts` reproduce esta misma lógica en el cliente
-(`hasAnyRole`, `hasModulePermission`, y funciones específicas como `canReadProducts` /
-`canWriteProducts`, `canReadSales` / `canWriteSales` / `canCancelSales`, `canReadReports`, etc.)
-para controlar qué puede ver y hacer cada usuario en la interfaz, en espejo del backend.
-
-Las secciones «SSH» y «Operadores» que siguen describen el modelo de seguridad a nivel de sistema operativo pensado originalmente para Linux. Se conservan sin cambios como el estándar de referencia exigido: la sección [Seguridad en Windows](#seguridad-en-windows), más abajo, toma cada uno de esos controles y documenta, verificado contra el código real, cómo se logra (o se mejora) el mismo nivel de protección en la arquitectura Windows/WSL2 + Electron vigente (ver [Despliegue en Windows](../infra/windows/README.md)).
+Las secciones «SSH» y «Operadores» que siguen describen el modelo de seguridad a nivel de sistema operativo pensado originalmente para Linux, heredado de LICS sin cambios. La sección [Seguridad en Windows](#seguridad-en-windows), más abajo, documenta el despliegue de LICS en Windows (`infra/windows/`), que sigue en el repositorio como referencia — SIGEDA todavía no tiene un despliegue de producción propio (ver [Despliegue en Windows](../infra/windows/README.md)).
 
 ## SSH
 
@@ -130,11 +113,34 @@ También deberá configurar:
 
 El usuario que utiliza el sistema no debe tener permisos administrativos sobre Linux ni Docker.
 
+## Cifrado de documentos (propio de SIGEDA, RNF-10, RNF-13)
+
+Sección nueva: LICS no maneja archivos, así que esto no tiene equivalente en el documento
+original.
+
+- Los documentos cargados (CU-04) se cifran con **AES-256-GCM**
+  (`apps/documents/cifrado.py`, librería `cryptography`) antes de guardarse en un volumen
+  Docker aparte del de PostgreSQL (`sigeda_documentos_cifrados`). El SHA-256 se calcula
+  sobre el archivo original, antes de cifrar.
+- **SUPUESTO de este incremento:** la clave de cifrado (32 bytes) vive en
+  `infra/docker/.env` (fuera de Git, en `.gitignore`), no en el repositorio. La entrega
+  como secreto de Docker y la custodia física + digital de la clave que exige RNF-13 son
+  trabajo de despliegue real, todavía sin hacer (Incremento 3, cuando se decida el
+  despliegue de producción de SIGEDA).
+- La base de datos **no está cifrada en reposo**: solo los documentos y (cuando se
+  construya el respaldo de SIGEDA) los paquetes de respaldo. Nombres, cédulas y demás
+  datos personales de `persona`/`abonado` quedan legibles si alguien copia el volumen de
+  PostgreSQL directamente.
+
 ## Seguridad en Windows
+
+> Esta sección describe el despliegue de **LICS** en Windows, conservado tal
+> cual en `infra/windows/` como referencia. SIGEDA todavía no tiene un
+> despliegue de producción propio — ver [Pendientes principales](../README.md#pendientes-principales).
 
 Esta sección toma cada medida de las secciones anteriores (pensadas para
 Linux) y documenta su equivalente real en la arquitectura de producción
-vigente: WSL2 (Ubuntu 24.04, distro `lics-wsl`) + Docker Engine dentro de
+vigente de LICS: WSL2 (Ubuntu 24.04, distro `lics-wsl`) + Docker Engine dentro de
 esa distro + app de escritorio Electron en Windows (ver
 [`infra/windows/README.md`](../infra/windows/README.md) y
 [`docs/windows-desktop-stage-closure.md`](windows-desktop-stage-closure.md)).

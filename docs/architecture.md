@@ -1,16 +1,23 @@
 # Arquitectura del sistema
 
+Documento heredado de **LICS v2.5.0** (Alejandro Arias Rojas, con su
+autorización), la base de código de **SIGEDA**. La capa de infraestructura
+que describe (Docker Compose, Nginx como único punto de entrada, Next.js,
+Django/DRF, PostgreSQL) es la misma que usa SIGEDA hoy; lo que cambió al
+construir SIGEDA está en la capa de aplicación (modelos del Modelo ER
+v1.1, CU-04), no en esta arquitectura base — ver [CLAUDE.md](../CLAUDE.md).
+
 ## 1. Objetivo
 
 El sistema está diseñado para operar localmente en una computadora dedicada sin depender de una conexión permanente a Internet.
 
-> **Nota:** en producción sobre Windows, todo este stack (Nginx, Next.js,
-> Django, PostgreSQL) corre dentro de una distro WSL2, arrancada por una
-> app de escritorio Electron en vez de por Chromium en modo kiosco — ver
-> [Despliegue en Windows](../infra/windows/README.md). Los componentes y
-> el flujo interno descritos en este documento no cambian entre
-> plataformas; la única capa que varía es la de "interfaz final" (kiosco
-> Linux vs. ventana Electron en Windows).
+> **Nota:** esta descripción de producción en Windows (WSL2 + Electron) es
+> la de **LICS**, conservada en `infra/windows/` como referencia — ver
+> [Despliegue en Windows](../infra/windows/README.md). SIGEDA todavía no
+> tiene un despliegue de producción propio decidido. Los componentes y el
+> flujo interno descritos en este documento no cambian entre plataformas;
+> la única capa que varía es la de "interfaz final" (kiosco Linux vs.
+> ventana Electron en Windows).
 
 La arquitectura prioriza:
 
@@ -108,7 +115,15 @@ Las dependencias de Node utilizan un volumen separado:
 frontend_node_modules
 ```
 
-Los contenedores pueden eliminarse y recrearse sin perder los datos almacenados en PostgreSQL.
+**Propio de SIGEDA:** los documentos cargados (CU-04) se cifran y se guardan en un tercer
+volumen, aparte del de PostgreSQL:
+
+```text
+sigeda_documentos_cifrados
+```
+
+Los contenedores pueden eliminarse y recrearse sin perder los datos almacenados en PostgreSQL ni
+en el almacén de documentos cifrados.
 
 ## 6. Entornos
 

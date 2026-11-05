@@ -1,5 +1,25 @@
 # Backups y restauración
 
+Documento heredado de **LICS v2.5.0** (Alejandro Arias Rojas, con su
+autorización), que describe `scripts/backup.sh` y `scripts/restore.sh`
+tal como están hoy en el repositorio: **sin cambios, siguen respaldando
+solo PostgreSQL**. Para SIGEDA esto es incompleto a propósito, no un
+error — ver CLAUDE.md, sección 6, "Faltantes de LICS frente a SIGEDA":
+
+- **No incluye los documentos.** El volumen `sigeda_documentos_cifrados`
+  (ver [Arquitectura](architecture.md)) queda fuera de `backup.sh`: un
+  respaldo de LICS no tiene los archivos cargados por CU-04.
+- **No cifra el paquete de respaldo** (RNF-10 lo exige).
+- **`restore.sh` reemplaza toda la base, bitácora incluida**, y solo
+  corre desde la terminal. SIGEDA necesita restaurar desde la
+  aplicación (D-05), sin borrar `registro_bitacora` (RNF-11), con
+  respaldo previo automático y un registro en `registro_restauracion`.
+
+Nada de esto está construido todavía: queda para el Incremento 3. Hasta
+entonces, lo que sigue describe el comportamiento real y vigente de los
+scripts de LICS, que sí sirven para respaldar la base de datos mientras
+tanto.
+
 ## Objetivo
 
 Garantizar la recuperación de la información mediante respaldos verificables y un procedimiento de restauración controlado.

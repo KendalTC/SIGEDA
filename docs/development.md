@@ -1,5 +1,9 @@
 # Desarrollo
 
+Documento heredado de **LICS v2.5.0** (Alejandro Arias Rojas, con su
+autorización). El flujo de desarrollo (Docker Compose, Makefile) es el
+mismo que usa SIGEDA hoy.
+
 ## 1. Preparación
 
 Copiar la plantilla de variables:
@@ -8,7 +12,13 @@ Copiar la plantilla de variables:
 cp infra/docker/.env.example infra/docker/.env
 ```
 
-Editar el archivo y reemplazar todos los valores provisionales.
+Editar el archivo y reemplazar todos los valores provisionales. **Propio
+de SIGEDA:** también hay que generar una clave de cifrado real para
+`DOCUMENT_ENCRYPTION_KEY_B64` (CU-04, RNF-10):
+
+```bash
+python3 -c "import secrets,base64; print(base64.b64encode(secrets.token_bytes(32)).decode())"
+```
 
 ## 2. Levantar servicios
 
@@ -92,6 +102,14 @@ docker compose -f infra/docker/compose.yml config
 
 ## 10. Correr scripts de `scripts/` contra desarrollo
 
+> Esta sección describe `infra/docker/compose.prod.yml` y `scripts/`
+> exactamente como están hoy: siguen con el nombre de proyecto `lics`
+> (`compose.yml`, de desarrollo, ya se renombró a `sigeda`). Es a
+> propósito — están atados a `infra/windows/` e `infra/systemd/`
+> (conservados sin cambios como referencia) y se dejan para cuando se
+> decida el despliegue de producción de SIGEDA. Ver el README,
+> sección "Pendientes principales".
+
 Todos los scripts de `scripts/` apuntan a **producción** por defecto
 (`scripts/lib/common.sh`):
 
@@ -101,7 +119,8 @@ ENV_FILE="${LICS_ENV_FILE:-${PROJECT_ROOT}/infra/docker/.env.prod}"
 ```
 
 Los dos compose declaran proyectos distintos: `compose.yml` es
-`name: lics` y `compose.prod.yml` es `name: lics-prod`. Por eso un script
+`name: sigeda` y `compose.prod.yml` es `name: lics-prod` (todavía sin
+renombrar, ver la nota arriba). Por eso un script
 corrido contra el stack de desarrollo (`make up`) falla con:
 
 ```
@@ -124,7 +143,7 @@ combinación que funciona:
 - `compose.yml` solo interpola `POSTGRES_DB`, `POSTGRES_USER` y
   `POSTGRES_PASSWORD`, las tres están en `.env.prod`;
 - `.env.prod` no define `COMPOSE_PROJECT_NAME`, así que manda el
-  `name: lics` del propio `compose.yml` y el script encuentra los
+  `name: sigeda` del propio `compose.yml` y el script encuentra los
   contenedores de desarrollo;
 - el `.env` de desarrollo **no** sirve: le faltan `LICS_VERSION` y
   `HTTP_PORT`, que `validate_environment_file` exige;
