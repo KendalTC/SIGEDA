@@ -1,6 +1,6 @@
 import type { StoredSession } from "./types";
 
-const SESSION_STORAGE_KEY = "lics.auth.session";
+const SESSION_STORAGE_KEY = "sigeda.auth.session";
 
 function isAuthUser(value: unknown): boolean {
   if (!value || typeof value !== "object") {

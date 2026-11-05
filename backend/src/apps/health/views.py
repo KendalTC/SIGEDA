@@ -6,7 +6,7 @@ def health_check(request):
     return JsonResponse(
         {
             "status": "healthy",
-            "service": "Laboratorio de Inyección Castro Solís",
+            "service": "SIGEDA",
             "version": settings.APP_VERSION,
         }
     )

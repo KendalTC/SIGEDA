@@ -1,12 +1,29 @@
-# Sistema de diseño del frontend
+# Sistema de diseño del frontend (heredado de LICS)
 
 ## Proyecto
 
-Laboratorio de Inyección Castro Solís — LICS
+Documento original de **LICS** (Laboratorio de Inyección Castro Solís,
+Alejandro Arias Rojas), la base de código de SIGEDA. Describe la
+paleta, tipografía y componentes de `AppShell` que siguen usando las
+pocas pantallas de LICS que quedaron en el repo (inicio de sesión, mi
+cuenta, estado del sistema) tras retirar los módulos de negocio.
+
+**SIGEDA tiene su propia guía de estilo**, distinta de esta (Segoe UI,
+15px, #0B5C8A — ver `Prototipos_Interfaz_SIGEDA_v0.3`, sección 5),
+aplicada en `frontend/src/app/sigeda/sigeda.css` y usada solo dentro
+de `frontend/src/app/sigeda/`. Este documento no se actualiza a
+SIGEDA porque describe un sistema que ya no es el de SIGEDA.
 
 ## Estado
 
-Implementado. La paleta, tipografía, espaciado, radios, iconografía propia y los componentes de estructura base (`AppShell`, barra lateral, topbar, navegación) ya están construidos en `frontend/src/app/globals.css`, `frontend/src/components/layout/app-shell.tsx` y `frontend/src/components/icons/app-icons.tsx`, y se usan de forma consistente en los módulos existentes (inventario, compras, ventas, clientes, inyectores, servicios, usuarios, búsqueda). Este documento describe las reglas y valores reales vigentes, no un borrador pendiente de implementar.
+Implementado para LICS. La paleta, tipografía, espaciado, radios,
+iconografía propia y los componentes de estructura base (`AppShell`,
+barra lateral, topbar, navegación) siguen en
+`frontend/src/app/globals.css`, `frontend/src/components/layout/app-shell.tsx`
+y `frontend/src/components/icons/app-icons.tsx`, pero ya no hay
+módulos de negocio (inventario, compras, ventas, clientes, inyectores,
+servicios, usuarios, búsqueda): se retiraron al construir SIGEDA. Lo
+que describe este documento sobre esos módulos es histórico.
 
 ## Objetivo
 

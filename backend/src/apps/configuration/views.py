@@ -24,7 +24,7 @@ class SystemStatusView(APIView):
             {
                 "status": "healthy",
                 "service": (
-                    "Laboratorio de Inyección Castro Solís"
+                    "SIGEDA"
                 ),
                 "version": settings.APP_VERSION,
                 "server_time": timezone.now(),

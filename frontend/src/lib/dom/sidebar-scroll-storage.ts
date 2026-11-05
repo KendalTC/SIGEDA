@@ -1,4 +1,4 @@
-const SIDEBAR_SCROLL_STORAGE_KEY = "lics.nav.sidebarScrollTop";
+const SIDEBAR_SCROLL_STORAGE_KEY = "sigeda.nav.sidebarScrollTop";
 
 function getStorage(): Storage | null {
   if (typeof window === "undefined") {

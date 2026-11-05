@@ -1,6 +1,13 @@
 # Changelog
 
-Todos los cambios relevantes del proyecto LICS se documentan en este archivo.
+Todos los cambios relevantes del proyecto se documentan en este archivo.
+
+**SIGEDA** (Sistema de Gestión Documental del Acueducto Bodegas y Pilas) se
+construye desde el 04/11/2026 sobre la base de código de **LICS v2.5.0**
+(Alejandro Arias Rojas, con su autorización). Las entradas desde `[0.1.0]`
+hacia arriba son de SIGEDA; las entradas de `2.5.0` hacia abajo son el
+historial original de LICS, que se conserva tal cual por crédito a su autor
+y porque documenta decisiones de infraestructura que SIGEDA todavía usa.
 
 El formato utiliza estas categorías:
 
@@ -17,6 +24,57 @@ El formato utiliza estas categorías:
 ## [No liberado]
 
 Nada pendiente de registrar.
+
+---
+
+## [0.1.0] - 2026-11-05
+
+> Avance de Construcción (06/11/2026): script DDL del Modelo ER v1.1 y
+> rebanada vertical de CU-04 Cargar documento, sobre la base de LICS v2.5.0.
+
+### Added
+
+- Modelo ER v1.1 completo (14 tablas) como modelos Django, con CHECK, UQ
+  parciales, los 2 EXCLUDE de `vinculo_abonado` (RN-02) y llaves primarias
+  compuestas (apps `abonados`, `bitacora`, `respaldos`, y adiciones a
+  `accounts`, `configuration`, `documents`).
+- `db/ddl/sigeda_v1.1.sql`, generado desde la base migrada.
+- CU-04 Cargar documento: `ControladorDocumentos`, cifrado AES-256-GCM,
+  SHA-256, bitácora de solo inserción, API REST y frontend (PAN-05 con sus
+  6 estados, PAN-04 y PAN-13 mínimos), con la guía de estilo propia de
+  SIGEDA (`frontend/src/app/sigeda/`).
+- Catálogos iniciales (sectores, 14 tipos de documento, grupo "Permiso o
+  formulario") y datos de prueba ficticios.
+- `docs/evidencia/prueba_terminado_CU04.md`, con evidencia real.
+- 40 pruebas automáticas nuevas (`make test-sigeda`), una por cada
+  restricción del modelo y cada caso de la prueba de terminado de CU-04.
+
+### Removed
+
+- Apps de negocio de LICS (`inventory`, `sales`, `cash`, `customers`,
+  `legacy_migration`) y todo lo que dependía de ellas en `apps/core`
+  (búsqueda, panel de inicio, reportes, `ModulePermissions`,
+  `PaymentMethod`) y en el frontend (incluida la administración de
+  usuarios con permisos por módulo).
+- Documentación histórica de LICS no aplicable a SIGEDA (auditorías,
+  roadmap, backlog de cliente, migración DBF, modelo de datos de negocio,
+  capturas de pantalla de módulos de negocio).
+
+### Changed
+
+- Nombre del proyecto Docker Compose de desarrollo: `lics` → `sigeda`.
+- Marca visible en las pantallas que quedan de LICS (título, logo,
+  endpoint de salud) → SIGEDA.
+
+### Pending
+
+- Renombrar «lics» → «sigeda» en `infra/docker/compose.prod.yml`,
+  `scripts/` e `infra/windows`/`infra/systemd` (conservados intactos como
+  referencia): se deja para cuando se decida el despliegue de producción
+  de SIGEDA.
+- Incrementos 2 a 4 (sesión y cuentas, expediente completo, respaldo y
+  restauración, importación de SADA, tipos de documento, completitud,
+  bitácora, exportación) — ver CLAUDE.md, sección 9.
 
 ---
 

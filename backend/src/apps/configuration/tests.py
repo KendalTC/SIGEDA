@@ -67,7 +67,7 @@ class SystemStatusApiTest(APITestCase):
         )
         self.assertEqual(
             response.data["service"],
-            "Laboratorio de Inyección Castro Solís",
+            "SIGEDA",
         )
         self.assertIn("version", response.data)
         self.assertIn("server_time", response.data)

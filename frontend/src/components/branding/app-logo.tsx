@@ -49,7 +49,7 @@ export function AppLogo({
           ? "text-center"
           : "text-left",
       ].join(" ")}
-      aria-label="Laboratorio de Inyección Castro Solís"
+      aria-label="SIGEDA, Acueducto Bodegas y Pilas"
     >
       <p
         className={[
@@ -57,7 +57,7 @@ export function AppLogo({
           classes.company,
         ].join(" ")}
       >
-        Laboratorio de Inyección
+        Acueducto
       </p>
 
       <p
@@ -67,7 +67,7 @@ export function AppLogo({
           classes.spacing,
         ].join(" ")}
       >
-        Castro Solís
+        Bodegas y Pilas
       </p>
     </div>
   );

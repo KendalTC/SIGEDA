@@ -1,4 +1,4 @@
-# LICS
+# SIGEDA
 
 ![Python](https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white)
 ![Django](https://img.shields.io/badge/Django-5.2-092E20?logo=django&logoColor=white)
@@ -7,19 +7,26 @@
 ![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
 ![Next.js](https://img.shields.io/badge/Next.js-Frontend-000000?logo=nextdotjs&logoColor=white)
 ![Nginx](https://img.shields.io/badge/Nginx-Proxy-009639?logo=nginx&logoColor=white)
-![Windows](https://img.shields.io/badge/Windows-Offline%20Production-0078D4?logo=windows11&logoColor=white)
-![ReportLab](https://img.shields.io/badge/PDF-ReportLab-red)
 
-Sistema de gestión empresarial local diseñado para operar completamente offline en una computadora dedicada.
+**SIGEDA** (Sistema de Gestión Documental del Acueducto) digitaliza y organiza los expedientes de los
+1015 abonados de la ASADA **Acueducto Bodegas y Pilas** (Costa Rica), sustituyendo el archivo físico
+actual. No cubre facturación (queda en SADA), mantenimiento de averías ni conexiones nuevas.
 
-LICS está orientado a producción real, no a prototipo académico. Las decisiones técnicas priorizan estabilidad, mantenibilidad, seguridad, respaldo de datos, recuperación ante fallos, soporte técnico y operación local sin conexión permanente a Internet.
+Proyecto del curso **IF6100 Análisis y Diseño de Sistemas**, Universidad de Costa Rica, Sede de
+Occidente (Recinto de Grecia), Grupo 02, II Ciclo 2026. Equipo: Mariangel Arias Alfaro, Alejandro
+Arias Rojas, Sebastián Alfaro Arias y Kendal Trejos Cubero.
+
+Construido sobre la base de código de **[LICS v2.5.0](https://github.com/aleariasr/laboratorio-inyeccion-castro-solis)**
+(Alejandro Arias Rojas, integrante del equipo, quien autorizó su reutilización): infraestructura
+Docker/Nginx/Django/Next.js, patrones de backend y componentes de frontend. Las apps de negocio de
+LICS (inventario, ventas, caja, clientes) no aplican a SIGEDA y se retiraron; el detalle de qué se
+reutilizó, adaptó o quitó está en [CLAUDE.md](CLAUDE.md).
 
 ---
 
 # Índice
 
 - [Estado del proyecto](#estado-del-proyecto)
-- [Resumen funcional implementado](#resumen-funcional-implementado)
 - [Arquitectura general](#arquitectura-general)
 - [Tecnologías principales](#tecnologías-principales)
 - [Arquitectura del repositorio](#arquitectura-del-repositorio)
@@ -35,198 +42,23 @@ LICS está orientado a producción real, no a prototipo académico. Las decision
 
 Versión actual:
 
-    2.5.0
+    0.1.0
 
-Estado actual:
+Estado actual (Avance de Construcción, 06/11/2026):
 
-    Backend base cerrado.
-    Infraestructura productiva base implementada.
-    Frontend operativo completo para los flujos del negocio (login, panel de inicio accionable con
-    vistos recientemente, estado del sistema, búsqueda universal ampliada, productos con variantes
-    original/genérico, ubicaciones, proveedores, compras, costos de importación, ventas, clientes,
-    inyectores y servicios, cierre de caja semanal con desglose por método de pago, proforma y
-    facturas internas en PDF, conteos físicos, movimientos de inventario, reportes).
-    Backlog de la visita al cliente (2026-09, 20 puntos): completado, salvo §5 (sin definir todavía).
-    Auditoría de 30 mejoras (2026-09-21): completada en la 2.4.0 — impuesto y descuento, caja chica,
-    roles nuevos con permiso para ver costos, resumen de ventas comparativo, PDF e impresión de
-    reportes, Excel de movimientos, código propio de producto y menú de escritorio con progreso.
-    Ver docs/auditoria-mejoras-30-puntos-2026-09-21.md y CHANGELOG.md.
-    Plan de servicios, etiquetas, caja y traslados (2026-10-22): completado en la 2.5.0 — cobro
-    por líneas en servicios (mano de obra y accesorios con su precio), recepción de varios
-    inyectores a la vez, orden de productos y etiquetas con copias, traslados a la otra sede con
-    guía en PDF y crear cliente, producto, proveedor, etc. desde el mismo formulario.
-    Ver docs/auditoria-mejoras-2026-10-22.md y CHANGELOG.md.
-    Migración de datos legacy DBF del cliente (proveedores, productos y compras): completada
-    (2026-09-09) — ver docs/dbf-migration-closure.md.
-    Validación con flujos y datos reales: pendiente.
-
-El backend base ya incluye autenticación, usuarios, roles, permisos por módulo, inventario, compras, costos, ventas, clientes, inyectores, servicios, cierre de caja, búsqueda universal, reportes JSON, endpoint administrativo de estado y generación de documentos PDF (etiquetas, proforma y facturas internas) con códigos de barras reales.
-
-Documento principal de cierre:
-
-- [Cierre de backend base](docs/backend-base-closure.md)
-
----
-
-## Acceso y panel principal
-
-| Inicio de sesión | Panel de inicio |
-|---|---|
-| ![Inicio de sesión](docs/images/screenshots/login.png) | ![Panel de inicio](docs/images/screenshots/dashboard.png) |
-
-![Búsqueda universal](docs/images/screenshots/busqueda-universal.png)
-
-## Inventario
-
-| Listado de productos | Producto con variantes |
-|---|---|
-| ![Listado de productos](docs/images/screenshots/productos-listado.png) | ![Producto con variantes](docs/images/screenshots/producto-detalle-variantes.png) |
-
-| Ubicaciones | Movimientos (kardex) | Conteos físicos |
-|---|---|---|
-| ![Ubicaciones](docs/images/screenshots/ubicaciones-listado.png) | ![Movimientos de inventario](docs/images/screenshots/movimientos-inventario.png) | ![Conteos físicos](docs/images/screenshots/conteos-fisicos.png) |
-
-## Compras y costos
-
-| Detalle de compra | Resumen de costos de importación |
-|---|---|
-| ![Detalle de compra](docs/images/screenshots/compra-detalle.png) | ![Costos de importación](docs/images/screenshots/costos-importacion.png) |
-
-## Ventas
-
-| Listado de ventas | Detalle de venta |
-|---|---|
-| ![Listado de ventas](docs/images/screenshots/ventas-listado.png) | ![Detalle de venta](docs/images/screenshots/venta-detalle.png) |
-
-## Clientes y servicio técnico
-
-![Detalle de cliente](docs/images/screenshots/cliente-detalle.png)
-
-| Bandeja de servicios | Detalle de servicio |
-|---|---|
-| ![Bandeja de servicios](docs/images/screenshots/servicios-bandeja.png) | ![Detalle de servicio](docs/images/screenshots/servicio-detalle.png) |
-
-## Caja
-
-| Nuevo cierre (desglose por método de pago) | Detalle de cierre |
-|---|---|
-| ![Nuevo cierre de caja](docs/images/screenshots/cierre-caja-nuevo.png) | ![Detalle de cierre de caja](docs/images/screenshots/cierre-caja-detalle.png) |
-
-## Reportes y documentos
-
-| Galería de reportes | Reporte abierto |
-|---|---|
-| ![Galería de reportes](docs/images/screenshots/reportes-galeria.png) | ![Reporte abierto](docs/images/screenshots/reporte-ejemplo.png) |
-
-| Factura interna | Proforma | Etiqueta con código de barras |
-|---|---|---|
-| ![Factura interna](docs/images/screenshots/factura-pdf.png) | ![Proforma](docs/images/screenshots/proforma-pdf.png) | ![Etiqueta de producto](docs/images/screenshots/etiqueta-pdf.png) |
-
-## Administración
-
-| Usuarios | Estado del sistema |
-|---|---|
-| ![Usuarios](docs/images/screenshots/usuarios-listado.png) | ![Estado del sistema](docs/images/screenshots/estado-sistema.png) |
-
-## App de escritorio (Windows)
-
-![App de escritorio en Windows](docs/images/screenshots/app-escritorio-windows.png)
-
----
-
-# Resumen funcional implementado
-
-## Infraestructura
-
-- Arquitectura basada en Docker Compose.
-- Base de datos PostgreSQL 17.
-- Backend desarrollado con Django y Django REST Framework.
-- Backend productivo ejecutado mediante Gunicorn.
-- Frontend desarrollado con Next.js.
-- Frontend productivo preparado en modo standalone.
-- Proxy inverso mediante Nginx.
-- Configuración separada para desarrollo y producción.
-- Instalación offline mediante paquetes versionados.
-- Verificación de integridad mediante SHA-256.
-- Healthchecks para los servicios principales.
-- Scripts de instalación, inicio, parada, reinicio, estado, respaldo, restauración, actualización y rollback.
-- Generación automatizada de secretos durante la instalación inicial.
-- Backups verificables.
-- Backups automáticos mediante systemd timer.
-- Política básica de retención local.
-- Restauración de prueba.
-- Restauración productiva controlada.
-- Actualización offline automatizada.
-- Rollback productivo validado.
-- Generación de paquetes offline.
-- Imágenes Docker orientadas a `linux/amd64`.
-- Arranque automático preparado mediante systemd.
-- Modo kiosco preparado para estaciones gráficas Linux (`infra/systemd/lics-kiosk.service`), documentado pero ya no es el plan de producción vigente.
-- App de escritorio nativa para Windows (Electron + WSL2 + Docker Engine): instalador `.exe`, imagen dorada, arranque y actualización automáticos — ver [Despliegue en Windows](infra/windows/README.md).
-
-## Backend operativo
-
-- Login, logout y usuario actual.
-- Administración básica de usuarios.
-- Roles base del sistema (Administrador, Inventario, Ventas, Clientes y servicio, Solo lectura) y permiso aparte para ver costos (`view_costs`) — ver [Seguridad](docs/security.md).
-- Permisos por módulo.
-- Usuario de solo lectura.
-- Cambio de la propia contraseña y restablecimiento por el Administrador (mínimo 8 caracteres).
-- Endpoint administrativo de estado.
-- Ubicaciones físicas.
-- Productos, con variantes (original/genérico/otro) que comparten un mismo código estándar pero tienen precio, stock y ubicación propios (§3.6) — reemplaza el antiguo modelo de "referencias" puramente descriptivas.
-- Código propio opcional por producto (único cuando tiene valor), buscable y usado en el código de barras de la etiqueta.
-- Precio de venta editable por producto, con sugerencia calculada desde la última compra confirmada; solo lo cambia quien ve costos.
-- Proveedores.
-- Referencias proveedor-producto.
-- Compras.
-- Confirmación y anulación de compras.
-- Costos de importación.
-- Resumen de costos por compra.
-- Historial de costos append-only.
-- Ventas, con método de pago (efectivo/tarjeta/transferencia/otro), descuento (monto o porcentaje) e impuesto (13 % por defecto), con los montos congelados al confirmar.
-- Confirmación y anulación de ventas.
-- Validación de stock suficiente.
-- Clientes.
-- Inyectores.
-- Servicios de inyector: recepción de uno o varios inyectores del mismo cliente a la vez (un servicio por inyector); cobro por líneas (mano de obra u otros conceptos con cantidad y precio, más los accesorios con su precio fijado al agregarlos), con el total calculado; descuento e impuesto congelados al entregar, método de pago, catálogo de "Tipo de Servicio" con precio de mano de obra y descripción. Solo el Administrador ve y pone montos y entrega.
-- Accesorios de servicio ligados al inventario real de productos, con descuento y reversión de stock.
-- Traslados a otra sede: documento con líneas (borrador, confirmar que descuenta inventario, anular con motivo que lo devuelve) y guía en PDF sin costos; solo ADMIN.
-- Cierre de caja semanal (sábado a viernes), suma ventas y servicios por método de pago (efectivo/tarjeta/transferencia/otro), con desglose por método, impuestos cobrados (aparte del ingreso) y descuentos congelados al cerrar; caja chica con fondo semanal y salidas; solo ADMIN.
-- Documentos PDF: etiquetas, proforma (con cantidades, descuento e impuesto) y facturas internas (no fiscales) para ventas confirmadas y servicios entregados.
-- Conteo físico.
-- Ajustes auditables de inventario.
-- Búsqueda universal.
-- Reportes JSON, cada uno con su PDF (ruta hermana `.../pdf/`); Movimientos y "Productos que más se mueven" también en Excel (`.xlsx`).
-- Etiquetas PDF con código de barras Code128 real.
-- Migración de datos legacy DBF del cliente (proveedores, productos, compras): pipeline de
-  extracción, staging, validación, normalización, importación y conciliación (`apps.legacy_migration`),
-  con trazabilidad completa y sin contaminar el modelo de negocio — ver
-  [dbf-migration-closure.md](docs/dbf-migration-closure.md).
-
-## Frontend operativo
-
-- Autenticación con inicio y cierre de sesión.
-- Panel de inicio accionable: servicios listos para entregar, productos bajo mínimo, borradores de venta y de compra pendientes, alerta de cierre de caja pendiente de la semana, y "vistos recientemente" con los últimos elementos abiertos en todo el sistema (productos, ubicaciones, proveedores, compras, ventas, clientes, inyectores, servicios y cierres de caja).
-- Pantalla administrativa de estado del sistema.
-- Búsqueda universal con atajo de teclado y navegación a detalle, cubriendo productos (nombre/descripción/código), ubicaciones, proveedores, clientes (nombre/identificación/teléfono), ventas y servicios de inyector.
-- Módulo de productos: listado ordenable (código, nombre, descripción, ubicación, existencia o fechas, con orden natural y recordando el último), detalle, creación, edición, precio de venta editable con sugerencia, código propio, variantes original/genérico bajo el mismo código (creación guiada con ubicación propia, sin afectar el formulario normal de creación), historial de movimientos e impresión de etiquetas con el orden elegido y copias por producto.
-- Módulo de ubicaciones: listado, detalle, creación y edición.
-- Módulo de proveedores: listado, detalle, creación, edición y gestión de productos asociados.
-- Módulo de compras: listado con filtros, detalle, creación, edición de borrador, líneas de compra, confirmación y anulación con motivo.
-- Módulo de costos de importación: categorías, costos por compra con conversión de moneda mediante tipo de cambio, resumen de costos con desglose por producto, aplicación de costos e histórico append-only.
-- Módulo de ventas: listado con filtros, detalle, creación, edición de borrador, líneas de venta con el precio de venta precargado (y selección automática al escanear el código propio o universal) y validación de stock disponible, descuento e impuesto con resumen en vivo, confirmación y anulación con motivo, método de pago, descarga de factura interna para ventas confirmadas.
-- Módulo de clientes: listado con filtros (búsqueda, tipo, activo/inactivo), detalle con inyectores y ventas relacionadas, creación y edición.
-- Módulo de inyectores y servicios: inyectores (listado, detalle, creación, edición), recepción en un solo formulario (cliente, varios inyectores, fecha, tipo y lo que reporta el cliente, con aviso si el inyector ya tiene un servicio abierto), "Corregir recepción" mientras no esté entregado, y bandeja operativa de servicios (iniciar, marcar listo, entregar, anular — la entrega exige que el servicio tenga total) con datos técnicos editables, líneas de cobro, accesorios reales de inventario editables (cantidad, precio y notas), método de pago, aviso al entregar en ₡0 y descarga de factura interna con el detalle para servicios entregados. Tipos de servicio en `/services/types`.
-- Módulo de traslados (`/inventory/transfers`, solo ADMIN): listado, creación con líneas, confirmación, anulación con motivo y guía en PDF; la sede se elige o se crea desde el mismo traslado.
-- Crear desde el formulario: cuando un buscador no encuentra lo escrito ofrece "+ Crear … «lo buscado»", y las listas desplegables terminan en "+ Nueva …"; ambos abren una ventana encima que deja elegido lo creado sin perder lo escrito (cliente, proveedor, producto, ubicación, sede, tipo de servicio, inyector, categoría de costo).
-- Módulo de cierre de caja: listado con filtro por fechas y buscador, detalle con PDF, creación eligiendo de la lista de semanas por cerrar, con previsualización del desglose esperado por método de pago (efectivo/tarjeta/transferencia/otro), los impuestos y el ingreso del negocio, y la caja chica (fondo, salidas y saldo) antes de confirmar; un único campo de "total contado" que se compara contra lo cobrado más el saldo de caja chica (así se concilia igual que en el proceso real: efectivo + vouchers de datáfono + comprobantes de transferencia contra lo registrado); semana sábado-viernes, solo visible para ADMIN.
-- Proforma: desde Ventas (`/sales/proforma`, con cantidades) o desde el listado de productos, cliente opcional, descuento e impuesto.
-- Mi cuenta: cambio de la propia contraseña.
-- Módulo de conteos físicos: listado con filtros (búsqueda, estado, rango de fechas, activo/inactivo), creación, captura rápida de líneas (búsqueda de producto, cantidad, avance con Enter, prevención de duplicados), diferencia visible contra el stock actual del sistema, edición y eliminación de líneas en borrador, aprobación y anulación.
-- Navegación por roles y permisos.
-- Módulo de movimientos de inventario: listado general paginado con filtros (producto, ubicación, tipo, dirección, rango de fechas), modo kardex automático con saldo corriente al filtrar por un solo producto, enlace desde cada movimiento a su origen (compra, venta, conteo físico o servicio), y exportación a PDF y Excel con los mismos filtros.
-- Módulo de reportes: 9 reportes operativos (bajo mínimo, stock por ubicación, movimientos, productos que más se mueven, compras por proveedor, comparación de precios por proveedor, resumen de ventas comparativo, productos más vendidos, clientes con más ventas), accesibles desde una galería en `/reports` y una única entrada "Reportes" en el menú lateral. Cada uno con "Descargar PDF" e "Imprimir" (con espacios para anotar a mano y recuadro de revisión).
+    Script DDL del Modelo ER v1.1 (14 tablas) generado y verificado: db/ddl/sigeda_v1.1.sql.
+    Modelos Django de las 14 tablas, con CHECK, UQ parciales, los 2 EXCLUDE de vinculo_abonado
+    (RN-02) y llaves primarias compuestas (Django 5.2).
+    Rebanada vertical de CU-04 Cargar documento: backend (ControladorDocumentos, cifrado
+    AES-256-GCM, SHA-256, bitácora de solo inserción), API REST y frontend (PAN-05 con sus 6
+    estados, PAN-04 y PAN-13 mínimos), con la guía de estilo propia de SIGEDA.
+    Prueba de terminado ejecutada contra el stack real, con evidencia real (no inventada) en
+    docs/evidencia/prueba_terminado_CU04.md.
+    0 infracciones de accesibilidad (axe-core) en las pantallas construidas.
+    Apps de negocio de LICS y su documentación histórica retiradas del repositorio.
+    Resto del sistema (sesión y cuentas, expediente completo, respaldo y restauración,
+    importación de SADA, tipos de documento, completitud, bitácora, exportación): sin construir
+    todavía — ver Incrementos 2 a 4 en CLAUDE.md, sección 9.
 
 ---
 
@@ -235,7 +67,7 @@ Documento principal de cierre:
     Usuario
       |
       v
-    App de escritorio (Electron) o navegador
+    Navegador
       |
       v
     http://localhost
@@ -250,18 +82,19 @@ Documento principal de cierre:
               v
           PostgreSQL
 
-Todos los componentes se ejecutan como servicios independientes mediante Docker Compose.
+Todos los componentes se ejecutan como servicios independientes mediante Docker Compose. Los
+documentos cargados se cifran con AES-256-GCM antes de guardarse en un volumen aparte del de
+PostgreSQL; la clave vive fuera del repositorio.
 
-En producción sobre Windows, todo este stack corre dentro de una distro WSL2 (Ubuntu 24.04 + Docker Engine); la app de escritorio Electron lo arranca, lo verifica y muestra la interfaz en una ventana nativa — sin modo kiosco, porque la misma computadora también se usa para otras tareas. El modo kiosco con Chromium sobre Linux (Ubuntu Desktop / Linux Mint) se mantiene documentado como alternativa, pero ya no es el plan de producción vigente.
-
-En producción, solamente Nginx publica un puerto hacia el equipo anfitrión. PostgreSQL, backend y frontend permanecen dentro de la red interna de Docker.
+El despliegue de producción de SIGEDA (laptop local de la ASADA o una máquina virtual Linux en
+Azure) sigue sin decidirse. El despliegue de LICS para Windows (Electron + WSL2 + Docker Engine) se
+conserva en el repositorio como referencia — ver [Despliegue en Windows](infra/windows/README.md) —
+pero todavía no aplica a SIGEDA.
 
 Documentación relacionada:
 
 - [Arquitectura del sistema](docs/architecture.md)
-- [Estructura de instalación en producción](docs/production-layout.md)
-- [Despliegue en Windows (app de escritorio)](infra/windows/README.md)
-- [Despliegue (histórico, plan Linux/kiosco)](docs/deployment.md)
+- [Despliegue en Windows de LICS (referencia, no vigente para SIGEDA)](infra/windows/README.md)
 
 ---
 
@@ -269,52 +102,52 @@ Documentación relacionada:
 
 | Área | Tecnología |
 |---|---|
-| Plataforma de producción | Windows 10/11 con WSL2 (Ubuntu 24.04) |
-| App de escritorio | Electron + electron-builder (instalador NSIS) |
-| Contenedores | Docker Engine (dentro de WSL2) + Docker Compose |
-| Backend | Python, Django, Django REST Framework |
-| Servidor backend | Gunicorn |
-| Frontend | Next.js, React, TypeScript |
-| Base de datos | PostgreSQL 17 |
+| Contenedores | Docker Engine + Docker Compose |
+| Backend | Python 3.13, Django 5.2.6, Django REST Framework 3.16.1 |
+| Cifrado de documentos | AES-256-GCM (`cryptography`), SHA-256 |
+| Frontend | Next.js 16, React 19, TypeScript |
+| Base de datos | PostgreSQL 17 (`btree_gist`, `unaccent`, `pg_trgm`) |
 | Proxy local | Nginx |
-| Documentos PDF | ReportLab |
-| Interfaz final | Ventana nativa de Electron (Chromium en modo kiosco, documentado como alternativa Linux) |
-| Soporte técnico | `docs/troubleshooting.md` + `infra/windows/README.md` (vía WSL, sin SSH) |
 | Versionado | Git y GitHub |
-| Distribución | Instalador `.exe` (imagen dorada embebida), por USB o red |
 
 ---
 
 # Arquitectura del repositorio
 
     backend/
-        Código fuente del backend Django.
+        Código fuente del backend Django. Apps del Modelo ER v1.1: abonados, accounts,
+        bitacora, configuration, documents, respaldos. apps/core y apps/health heredadas de
+        LICS, recortadas a lo genérico.
 
     frontend/
-        Aplicación web desarrollada con Next.js.
+        Aplicación Next.js. Las pantallas propias de SIGEDA viven en frontend/src/app/sigeda/
+        y frontend/src/features/sigeda/, con su propia guía de estilo
+        (frontend/src/app/sigeda/sigeda.css). El resto (login, mi cuenta, estado del sistema)
+        es lo que queda de LICS tras retirar sus módulos de negocio.
+
+    db/ddl/
+        Script DDL del Modelo ER v1.1, generado desde la base migrada.
 
     infra/
-        Configuración de Docker, Nginx y componentes de infraestructura.
-
-    scripts/
-        Automatización de instalación, operación, respaldo, restauración, actualización y soporte.
+        Configuración de Docker, Nginx y componentes de infraestructura. infra/windows/,
+        infra/windows-demo/ e infra/systemd/ son el despliegue de LICS para Windows,
+        conservados como referencia.
 
     docs/
-        Documentación técnica y operativa del proyecto.
+        Documentación técnica heredada de LICS y evidencia propia de SIGEDA (docs/evidencia/).
+
+    CLAUDE.md
+        Contexto completo del proyecto SIGEDA: requerimientos, modelo de datos, arquitectura,
+        reglas de trabajo.
 
     VERSION
         Versión actual del proyecto.
-
-    CHANGELOG.md
-        Historial de cambios.
 
 ---
 
 # Entornos
 
 ## Desarrollo
-
-El entorno de desarrollo está diseñado para ejecutarse desde una estación de trabajo compatible con Docker.
 
 Requisitos:
 
@@ -327,9 +160,16 @@ Configuración inicial:
 
     cp infra/docker/.env.example infra/docker/.env
 
+Editar `infra/docker/.env` y generar una clave de cifrado real:
+
+    python3 -c "import secrets,base64; print(base64.b64encode(secrets.token_bytes(32)).decode())"
+
 Inicio:
 
     make up
+    make migrate
+    docker compose -f infra/docker/compose.yml exec backend python src/manage.py setup_roles
+    docker compose -f infra/docker/compose.yml exec backend python src/manage.py seed_sigeda_demo
 
 Administración:
 
@@ -341,33 +181,11 @@ Administración:
     make makemigrations
     make shell
     make test
+    make test-sigeda
 
 ## Producción
 
-El entorno de producción vigente es la app de escritorio nativa para Windows 10/11: un instalador
-`.exe` que prepara una distro WSL2 (Ubuntu 24.04) con Docker Engine y una app Electron que arranca,
-verifica y muestra la interfaz. Las imágenes Docker que corren dentro de esa distro siguen orientadas a
-`linux/amd64` — ver [Despliegue en Windows](infra/windows/README.md) y
-[Cierre de etapa: app de escritorio Windows](docs/windows-desktop-stage-closure.md).
-
-El proceso productivo utiliza:
-
-- imágenes Docker versionadas (`linux/amd64`), embebidas en el instalador como imagen dorada;
-- instalación automatizada mediante el instalador `.exe`;
-- generación automática de secretos;
-- configuración independiente de desarrollo;
-- validaciones previas de instalación;
-- comprobaciones automáticas de salud;
-- respaldos automáticos (systemd timer dentro de WSL2, con arranque programado vía tarea de Windows);
-- restauración controlada;
-- actualización offline (expuesta como botón "Actualizar aplicación" en el menú de la app);
-- rollback (procedimiento manual por WSL, no expuesto como botón).
-
-La instalación productiva no depende del repositorio Git ni de acceso a Internet para operar.
-
-El plan original de despliegue directo sobre un equipo Linux x86_64 dedicado (Ubuntu Desktop/Linux Mint
-en modo kiosco) se mantiene documentado como registro histórico en
-[Despliegue (histórico)](docs/deployment.md), pero ya no es el plan de producción vigente.
+Sin decidir todavía (CLAUDE.md, sección 6: "Despliegue: sigue abierto").
 
 ---
 
@@ -378,112 +196,27 @@ en modo kiosco) se mantiene documentado como registro histórico en
     GET /api/health/
     GET /api/system/status/
 
-`/api/health/` es el healthcheck técnico utilizado por la infraestructura.
-
-`/api/system/status/` es un endpoint administrativo. Requiere un usuario
-superusuario, `is_staff` o miembro del grupo `ADMIN`. Los usuarios
-autenticados sin privilegios administrativos reciben `403 Forbidden`.
-
-## Cuentas
+## Cuentas de LICS (genérico, Django `auth.User`; no es el sistema de `Cuenta` de SIGEDA)
 
     POST /api/accounts/login/
     POST /api/accounts/logout/
     GET /api/accounts/me/
     POST /api/accounts/me/password/
-    GET /api/accounts/roles/
-    GET /api/accounts/users/
-    POST /api/accounts/users/
-    GET /api/accounts/users/{id}/
-    PATCH /api/accounts/users/{id}/
-    POST /api/accounts/users/{id}/set-password/
 
-## Inventario y compras
+## SIGEDA — autenticación de `Cuenta` (RF-01, RNF-09)
 
-    GET /api/inventory/locations/
-    GET /api/inventory/products/
-    GET /api/inventory/products/?standard_code=<codigo>
-    GET /api/inventory/products/?ordering=-current_stock
-    POST /api/inventory/products/{id}/add-variant/
-    POST /api/inventory/products/labels/
-    GET /api/inventory/suppliers/
-    GET /api/inventory/supplier-products/
-    GET /api/inventory/purchases/
-    POST /api/inventory/purchases/{id}/confirm/
-    POST /api/inventory/purchases/{id}/cancel/
-    POST /api/inventory/purchases/{id}/calculate-costs/
-    GET /api/inventory/purchases/{id}/cost-summary/
-    GET /api/inventory/purchase-items/
-    GET /api/inventory/import-cost-categories/
-    GET /api/inventory/import-costs/
-    GET /api/inventory/product-cost-history/
-    GET /api/inventory/stock-movements/
-    GET /api/inventory/stock-movements/pdf/
-    GET /api/inventory/stock-movements/excel/
-    GET /api/inventory/inventory-counts/
-    POST /api/inventory/inventory-counts/{id}/approve/
-    POST /api/inventory/inventory-counts/{id}/cancel/
-    GET /api/inventory/branches/
-    GET /api/inventory/stock-transfers/
-    POST /api/inventory/stock-transfers/{id}/confirm/
-    POST /api/inventory/stock-transfers/{id}/cancel/
-    GET /api/inventory/stock-transfers/{id}/guide/
-    GET /api/inventory/stock-transfer-items/
+    POST /api/sigeda/auth/login/
+    POST /api/sigeda/auth/logout/
+    GET /api/sigeda/auth/me/
+    POST /api/sigeda/auth/cambiar-contrasena/
 
-## Ventas
+## SIGEDA — CU-04 Cargar documento
 
-    GET /api/sales/sales/
-    POST /api/sales/sales/
-    POST /api/sales/sales/{id}/confirm/
-    POST /api/sales/sales/{id}/cancel/
-    GET /api/sales/sale-items/
-    POST /api/sales/sale-items/
-
-## Clientes e inyectores
-
-    GET /api/customers/customers/
-    GET /api/customers/injectors/
-    GET /api/customers/service-records/
-    POST /api/customers/service-records/receive/
-    POST /api/customers/service-records/{id}/start/
-    POST /api/customers/service-records/{id}/mark-ready/
-    POST /api/customers/service-records/{id}/deliver/
-    POST /api/customers/service-records/{id}/cancel/
-    GET /api/customers/service-accessories/
-    GET /api/customers/service-charge-lines/
-    GET /api/customers/service-types/
-
-## Caja
-
-    GET /api/cash/closings/
-    POST /api/cash/closings/
-    GET /api/cash/closings/closeable_weeks/
-    GET /api/cash/closings/preview/?week_start=YYYY-MM-DD
-    GET /api/cash/closings/{id}/pdf/
-    GET /api/cash/petty-cash/?week_start=YYYY-MM-DD
-    POST /api/cash/petty-cash/
-    DELETE /api/cash/petty-cash/{id}/
-
-## Búsqueda, reportes y documentos
-
-    GET /api/search/?q=texto
-    GET /api/reports/low-stock-products/
-    GET /api/reports/stock-by-location/
-    GET /api/reports/product-movements/?product=<id>
-    GET /api/reports/product-supplier-prices/?product=<id>
-    GET /api/reports/purchases-by-supplier/?date_from=YYYY-MM-DD&date_to=YYYY-MM-DD
-    GET /api/reports/sales-summary/?date_from=YYYY-MM-DD&date_to=YYYY-MM-DD&group_by=day&compare_from=YYYY-MM-DD&compare_to=YYYY-MM-DD
-    GET /api/reports/top-selling-products/?date_from=YYYY-MM-DD&date_to=YYYY-MM-DD
-    GET /api/reports/top-customers/?date_from=YYYY-MM-DD&date_to=YYYY-MM-DD&ordering=total
-    GET /api/reports/most-moved-products/?date_from=YYYY-MM-DD&date_to=YYYY-MM-DD
-    GET /api/reports/most-moved-products/excel/
-
-Cada reporte (salvo `product-movements`) tiene su PDF en la ruta hermana `.../pdf/`, con los mismos
-filtros: por ejemplo `GET /api/reports/sales-summary/pdf/?date_from=...&date_to=...`.
-
-    GET /api/documents/product-labels/?product=<id>&product=<id>
-    POST /api/documents/proforma/
-    GET /api/documents/sales/{id}/invoice/
-    GET /api/documents/services/{id}/invoice/
+    GET /api/sigeda/abonados/{numero_paja}/expediente/
+    POST /api/sigeda/documentos/cargar/
+    GET /api/sigeda/documentos/{id_documento}/versiones/
+    GET /api/sigeda/documentos/{id_documento}/versiones/{numero_version}/descargar/
+    GET /api/sigeda/catalogos/tipos-documento/
 
 ---
 
@@ -492,83 +225,44 @@ filtros: por ejemplo `GET /api/reports/sales-summary/pdf/?date_from=...&date_to=
 Índice general:
 
 - [Índice de documentación](docs/index.md)
+- [CLAUDE.md](CLAUDE.md) — contexto completo del proyecto, requerimientos y reglas de trabajo
 
-Documentos de estado:
-
-- [Cierre de backend base](docs/backend-base-closure.md)
-- [Cierre de infraestructura productiva base](docs/infrastructure-stage-closure.md)
-- [Cierre de etapa: app de escritorio Windows](docs/windows-desktop-stage-closure.md)
-- [Cierre: migración legacy DBF](docs/dbf-migration-closure.md)
-- [Guía: llevar esta versión a producción](docs/guia-despliegue-produccion.md)
-- [Lista de preparación para producción — Windows (vigente)](docs/windows-production-checklist.md)
-- [Lista de preparación para producción (histórica, plan Linux/kiosco)](docs/production-readiness-checklist.md)
-- [Roadmap](docs/roadmap.md)
-
-Documentos técnicos:
+Documentos técnicos (heredados de LICS, todavía vigentes para SIGEDA):
 
 - [Arquitectura del sistema](docs/architecture.md)
-- [Modelo de datos](docs/data-model.md)
-- [Dominio de inventario](docs/domain/inventory.md)
-- [Estructura de instalación en producción](docs/production-layout.md)
-
-Documentos de frontend:
-
-- [Auditoría previa al frontend](docs/frontend-audit.md)
-- [Roadmap de frontend](docs/frontend-roadmap.md)
-- [Sistema de diseño del frontend](docs/frontend-design-system.md)
-
-Documentos operativos:
-
 - [Desarrollo](docs/development.md)
-- [Despliegue en Windows (vigente)](infra/windows/README.md)
-- [Despliegue (histórico, plan Linux/kiosco)](docs/deployment.md)
-- [Backups y restauración](docs/backup-restore.md)
-- [Proceso de actualización](docs/update-process.md)
+- [Backups y restauración (SIGEDA la adapta en el Incremento 3)](docs/backup-restore.md)
 - [Seguridad](docs/security.md)
-- [Solución de problemas](docs/troubleshooting.md)
+- [Sistema de diseño del frontend (de LICS; ver nota sobre la guía propia de SIGEDA)](docs/frontend-design-system.md)
 
-Insumos y trabajo en curso (no son documentación de referencia del sistema tal como está hoy):
+Evidencia propia de SIGEDA:
 
-- [Backlog de la visita al cliente (2026-09, 20 puntos)](docs/backlog-cliente-2026-09.md) — ya implementado.
-- [Plan de servicios, etiquetas, caja y traslados (2026-10-22)](docs/auditoria-mejoras-2026-10-22.md) — implementado en la 2.5.0.
+- [Prueba de terminado — CU-04 Cargar documento](docs/evidencia/prueba_terminado_CU04.md)
 
 ---
 
 # Estado de validación
 
-Validación técnica del backend base:
-
     Django check: OK
-    Migraciones pendientes: no
-    Tests backend: suite completa en verde, 852 tests con `make test` (2026-10-27, versión
-    2.5.0).
-    Build backend Docker: OK
-
-El backend base queda cerrado como `0.2.0-alpha`. Las fases posteriores (frontend operativo,
-backlog de la visita al cliente 2026-09, auditoría de 30 mejoras de la 2.4.0, plan del 2026-10-22
-de la 2.5.0) están descritas en [Roadmap](docs/roadmap.md).
+    Migraciones: al día
+    Tests backend: 54/54 en verde (make test)
+    Tests propios de SIGEDA: 40/40 en verde (make test-sigeda)
+    Accesibilidad (axe-core): 0 infracciones en las pantallas de SIGEDA construidas
 
 ---
 
 # Pendientes principales
 
-El frontend operativo, el backlog de la visita al cliente (2026-09), la auditoría de 30 mejoras
-(2.4.0) y el plan del 2026-10-22 (2.5.0) ya están completos — ver [Roadmap](docs/roadmap.md). Lo
-que queda antes de operar con datos reales del negocio:
+1. Renombrar «lics» → «sigeda» en `infra/docker/compose.prod.yml`, `scripts/` y lo que referencian
+   (`LICS_VERSION`, nombres de imagen): se dejó para cuando se decida el despliegue de producción
+   de SIGEDA, junto con `infra/windows/` e `infra/systemd/`.
+2. Incremento 2: sesión y cuentas (PAN-01, PAN-14, RNF-09 completo, contraseña temporal) y
+   expediente completo (PAN-02, PAN-04, PAN-06, PAN-13) con sus diálogos.
+3. Incremento 3: respaldo y restauración (incluye cifrar los documentos del respaldo, restaurar
+   desde la aplicación sin borrar la bitácora) e importación de SADA.
+4. Incremento 4: tipos de documento, completitud, bitácora (pantalla) y exportación.
+5. Segundo rol de PostgreSQL con permisos restringidos (solo INSERT/SELECT) para la bitácora en
+   tiempo de ejecución (ADR-05, RNF-11) — por ahora documentado como pendiente, no implementado.
+6. Preguntas abiertas con la administradora (CLAUDE.md, sección 9).
 
-1. Validación con usuarios y datos reales (Fase 8 del roadmap): revisión de flujos, campos,
-   reportes, documentos y permisos reales, con el negocio operando de verdad.
-2. Correr la migración DBF legacy (Fase 10, ya implementada y probada) contra los archivos reales
-   en la máquina de producción — ver
-   [Cierre: migración legacy DBF](docs/dbf-migration-closure.md) y
-   `scripts/migrate-legacy-dbf.sh`.
-3. Dos riesgos de la app de escritorio Windows sin validar con uso real extendido: el
-   endurecimiento de las tareas programadas ocultas (§10.3 de
-   [windows-desktop-stage-closure.md](docs/windows-desktop-stage-closure.md)) y el flujo
-   "Actualizar aplicación" nunca probado contra hardware real — ver
-   [checklist vigente](docs/windows-production-checklist.md). La 2.4.0 trae además un menú de
-   escritorio nuevo que hay que probar en la máquina Windows con su instalador.
-4. Documentos PDF adicionales más allá de proforma, facturas, reportes y cierre de caja (Fase 9):
-   catálogo interno, boletas de recepción/entrega de inyector — solo si el negocio los pide de
-   verdad.
-5. Manuales de usuario y técnico, capacitación y plan de soporte formal (Fase 12).
+Ver [CLAUDE.md](CLAUDE.md) para el detalle completo de requerimientos y el plan de incrementos.

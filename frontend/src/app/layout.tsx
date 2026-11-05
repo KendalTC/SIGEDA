@@ -6,12 +6,12 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: {
-    default: "LICS",
-    template: "%s | LICS",
+    default: "SIGEDA",
+    template: "%s | SIGEDA",
   },
   description:
-    "Sistema interno del Laboratorio de Inyección Castro Solís.",
-  applicationName: "LICS",
+    "Sistema de Gestión Documental del Acueducto Bodegas y Pilas.",
+  applicationName: "SIGEDA",
 };
 
 export default function RootLayout({

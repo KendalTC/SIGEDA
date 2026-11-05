@@ -1,4 +1,4 @@
-name: lics
+name: sigeda
 
 services:
   postgres:
