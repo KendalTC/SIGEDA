@@ -2,22 +2,6 @@ from django.conf import settings
 from django.db import models
 
 
-class PaymentMethod(models.TextChoices):
-    """
-    Compartido entre apps.sales (Sale) y apps.customers
-    (InjectorServiceRecord) para saber cuánto de lo vendido/cobrado
-    en una semana fue efectivo (necesario para apps.cash). Vive en
-    core porque apps.customers no puede importar de apps.sales (ya
-    es al revés: Sale.customer importa de apps.customers) y ambas
-    apps necesitan esta misma clasificación.
-    """
-
-    CASH = "CASH", "Efectivo"
-    CARD = "CARD", "Tarjeta"
-    TRANSFER = "TRANSFER", "Transferencia"
-    OTHER = "OTHER", "Otro"
-
-
 class TimeStampedModel(models.Model):
     """
     Modelo abstracto que agrega fechas de creación y modificación.
@@ -64,75 +48,3 @@ class AuditModel(TimeStampedModel):
 
     class Meta:
         abstract = True
-
-
-class ModulePermissions(models.Model):
-    """
-    Modelo fantasma (sin tabla en la base de datos) que existe
-    únicamente para declarar los permisos de cada módulo funcional
-    del sistema.
-
-    Los módulos de negocio no siempre coinciden 1:1 con un modelo de
-    Django (ej. "Compras" agrupa Purchase, PurchaseItem, ImportCost
-    e ImportCostCategory), así que en vez de usar los permisos
-    automáticos de cada modelo (add_purchase, add_purchaseitem, ...)
-    se declara un permiso explícito por módulo y acción acá.
-
-    Ver apps/core/permissions.py para cómo se consumen estos
-    permisos, y apps/core/management/commands/setup_roles.py para
-    cómo se le asignan a cada rol preset.
-    """
-
-    class Meta:
-        managed = False
-        default_permissions = ()
-        permissions = [
-            ("view_products", "Productos: ver"),
-            ("add_products", "Productos: crear"),
-            ("change_products", "Productos: editar"),
-            ("view_locations", "Ubicaciones: ver"),
-            ("add_locations", "Ubicaciones: crear"),
-            ("change_locations", "Ubicaciones: editar"),
-            ("view_suppliers", "Proveedores: ver"),
-            ("add_suppliers", "Proveedores: crear"),
-            ("change_suppliers", "Proveedores: editar"),
-            ("view_purchases", "Compras: ver"),
-            ("add_purchases", "Compras: crear"),
-            ("change_purchases", "Compras: editar"),
-            ("cancel_purchases", "Compras: cancelar"),
-            ("view_inventory_counts", "Conteos físicos: ver"),
-            ("add_inventory_counts", "Conteos físicos: crear"),
-            ("change_inventory_counts", "Conteos físicos: editar"),
-            ("cancel_inventory_counts", "Conteos físicos: cancelar"),
-            ("view_sales", "Ventas: ver"),
-            ("add_sales", "Ventas: crear"),
-            ("change_sales", "Ventas: editar"),
-            ("cancel_sales", "Ventas: cancelar"),
-            ("view_customers", "Clientes: ver"),
-            ("add_customers", "Clientes: crear"),
-            ("change_customers", "Clientes: editar"),
-            ("view_injectors", "Inyectores: ver"),
-            ("add_injectors", "Inyectores: crear"),
-            ("change_injectors", "Inyectores: editar"),
-            ("view_services", "Servicios: ver"),
-            ("add_services", "Servicios: crear"),
-            ("change_services", "Servicios: editar"),
-            ("cancel_services", "Servicios: cancelar"),
-            # Todo dato derivado del costo de una compra: histórico de
-            # costos y precio sugerido del producto. Separado de
-            # view_products a propósito, para que un rol pueda buscar
-            # productos sin ver cuánto costaron.
-            ("view_costs", "Costos: ver"),
-            ("view_reports", "Reportes: ver"),
-            ("view_documents", "Documentos: ver"),
-            ("add_documents", "Documentos: crear"),
-            ("view_movements", "Movimientos de inventario: ver"),
-            ("view_cash", "Caja: ver"),
-            ("add_cash", "Caja: crear"),
-            # Punto 6 del plan del 2026-10-22. Ningún rol los recibe:
-            # solo el Administrador (que tiene todo).
-            ("view_transfers", "Traslados: ver"),
-            ("add_transfers", "Traslados: crear"),
-            ("change_transfers", "Traslados: editar"),
-            ("cancel_transfers", "Traslados: cancelar"),
-        ]

@@ -38,6 +38,7 @@ services:
     working_dir: /app
     volumes:
       - ../../backend:/app
+      - sigeda_documentos_cifrados:/app/almacen_cifrado
     command:
       - sh
       - -c
@@ -119,6 +120,7 @@ services:
 volumes:
   postgres_data:
   frontend_node_modules:
+  sigeda_documentos_cifrados:
 
 networks:
   application:

@@ -1,0 +1,49 @@
+/*
+ * Guía de estilo de SIGEDA (Prototipos_Interfaz_SIGEDA_v0.3, sección
+ * 5): Segoe UI, texto de 15px, títulos de 22px, color principal
+ * #0B5C8A, estados con fondo + texto (contraste mínimo 4.5:1).
+ *
+ * Solo redefine las variables dentro de .sigeda-tema: el resto de
+ * LICS (apps de negocio, todavía sin retirar) sigue con su propia
+ * paleta sin cambios.
+ */
+
+.sigeda-tema {
+  --font-sans:
+    "Segoe UI",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Helvetica Neue",
+    Arial,
+    sans-serif;
+
+  --color-primary: #0b5c8a;
+  --color-primary-hover: #094a6f;
+  --color-primary-active: #073a58;
+  --color-primary-soft: #e6f0f5;
+
+  --color-success: #2f7a45;
+  --color-success-soft: #e6f2ea;
+
+  --color-warning: #7a5600;
+  --color-warning-soft: #fff4d6;
+
+  --color-danger: #a61b1b;
+  --color-danger-hover: #8f1717;
+  --color-danger-soft: #fbe9e9;
+
+  font-family: var(--font-sans);
+  font-size: 15px;
+  min-height: 100dvh;
+  background: var(--color-background);
+}
+
+.sigeda-tema h1 {
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.sigeda-tema h2 {
+  font-size: 18px;
+  font-weight: 600;
+}

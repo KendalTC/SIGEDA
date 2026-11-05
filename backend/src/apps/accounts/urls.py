@@ -1,23 +1,13 @@
 from django.urls import path
-from rest_framework.routers import DefaultRouter
 
 from .views import (
     ChangeOwnPasswordView,
     CurrentUserView,
     LoginView,
     LogoutView,
-    RoleListView,
-    UserViewSet,
 )
 
 app_name = "accounts"
-
-router = DefaultRouter()
-router.register(
-    "users",
-    UserViewSet,
-    basename="user",
-)
 
 urlpatterns = [
     path("login/", LoginView.as_view(), name="login"),
@@ -28,7 +18,4 @@ urlpatterns = [
         ChangeOwnPasswordView.as_view(),
         name="change-own-password",
     ),
-    path("roles/", RoleListView.as_view(), name="roles"),
 ]
-
-urlpatterns += router.urls

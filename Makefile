@@ -26,7 +26,7 @@ shell:
 	$(COMPOSE) exec backend bash
 
 db:
-	$(COMPOSE) exec postgres psql -U lics -d lics
+	$(COMPOSE) exec postgres psql -U sigeda -d sigeda
 
 migrate:
 	$(BACKEND) migrate
@@ -38,34 +38,22 @@ check:
 	$(BACKEND) check
 
 test:
-	$(BACKEND) test --buffer apps.accounts apps.core apps.inventory apps.customers apps.sales apps.configuration apps.documents apps.cash apps.legacy_migration
+	$(BACKEND) test --buffer apps.accounts apps.core apps.configuration apps.documents apps.abonados apps.bitacora apps.respaldos
 
-test-inventory:
-	$(BACKEND) test --buffer apps.inventory
-
-test-core:
-	$(BACKEND) test --buffer apps.core
-
-test-customers:
-	$(BACKEND) test --buffer apps.customers
-
-test-sales:
-	$(BACKEND) test --buffer apps.sales
+test-sigeda:
+	$(BACKEND) test --buffer apps.abonados apps.bitacora apps.respaldos apps.accounts.tests_sigeda apps.documents.tests_sigeda apps.configuration.tests_sigeda
 
 test-accounts:
 	$(BACKEND) test --buffer apps.accounts
+
+test-core:
+	$(BACKEND) test --buffer apps.core
 
 test-configuration:
 	$(BACKEND) test --buffer apps.configuration
 
 test-documents:
 	$(BACKEND) test --buffer apps.documents
-
-test-cash:
-	$(BACKEND) test --buffer apps.cash
-
-test-legacy-migration:
-	$(BACKEND) test --buffer apps.legacy_migration
 
 run:
 	$(BACKEND) runserver 0.0.0.0:8000

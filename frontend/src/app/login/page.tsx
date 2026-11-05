@@ -61,7 +61,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (status === "authenticated") {
-      router.replace("/dashboard");
+      router.replace("/account");
     }
   }, [router, status]);
 
@@ -93,7 +93,7 @@ export default function LoginPage() {
         password,
       });
 
-      router.replace("/dashboard");
+      router.replace("/account");
     } catch (error) {
       setErrorMessage(getLoginErrorMessage(error));
       passwordRef.current?.focus();

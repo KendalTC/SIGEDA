@@ -47,12 +47,11 @@ LOCAL_APPS = [
     "apps.accounts",
     "apps.configuration",
     "apps.health",
-    "apps.inventory",
-    "apps.customers",
-    "apps.sales",
     "apps.documents",
-    "apps.cash",
-    "apps.legacy_migration",
+    # Modelo ER v1.1 de SIGEDA.
+    "apps.abonados",
+    "apps.bitacora",
+    "apps.respaldos",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -172,3 +171,18 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # -----------------------------------------------------------------------------
 
 APP_VERSION = env("APP_VERSION", default="development")
+
+# -----------------------------------------------------------------------------
+# SIGEDA: almacén de documentos cifrados (RNF-10, ADR-02)
+# -----------------------------------------------------------------------------
+
+# SUPUESTO: para este incremento la clave vive en una variable de
+# entorno fuera del repositorio (infra/docker/.env, gitignored). La
+# entrega como secreto de Docker y la custodia física/digital (RNF-13)
+# quedan para el despliegue real (Incremento 3+); ver CLAUDE.md.
+DOCUMENT_ENCRYPTION_KEY_B64 = env("DOCUMENT_ENCRYPTION_KEY_B64", default=None)
+
+DOCUMENT_STORAGE_ROOT = env(
+    "DOCUMENT_STORAGE_ROOT",
+    default=str(BASE_DIR / "almacen_cifrado"),
+)

@@ -5,11 +5,10 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/health/", include("apps.health.urls")),
     path("api/accounts/", include("apps.accounts.urls")),
-    path("api/inventory/", include("apps.inventory.urls")),
-    path("api/sales/", include("apps.sales.urls")),
-    path("api/customers/", include("apps.customers.urls")),
-    path("api/", include("apps.core.urls")),
     path("api/", include("apps.configuration.urls")),
-    path("api/documents/", include("apps.documents.urls")),
-    path("api/cash/", include("apps.cash.urls")),
+    # SIGEDA: endpoints de CU-04 y lo que lo precede.
+    path("api/sigeda/auth/", include("apps.accounts.sigeda_urls")),
+    path("api/sigeda/abonados/", include("apps.abonados.urls")),
+    path("api/sigeda/documentos/", include("apps.documents.sigeda_urls")),
+    path("api/sigeda/catalogos/", include("apps.configuration.sigeda_urls")),
 ]

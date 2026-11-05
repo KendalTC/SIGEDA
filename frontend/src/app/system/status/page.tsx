@@ -242,7 +242,7 @@ export default function SystemStatusPage() {
             variant="secondary"
             className="mt-6"
             onClick={() => {
-              router.replace("/dashboard");
+              router.replace("/account");
             }}
           >
             Volver al inicio
