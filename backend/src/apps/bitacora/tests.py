@@ -36,6 +36,16 @@ class RegistroBitacoraConstraintsTests(TestCase):
                     origen=OrigenBitacora.SISTEMA,
                 )
 
+    def test_accion_fuera_de_dominio_se_rechaza(self):
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                RegistroBitacora.objects.create(
+                    cuenta=self.cuenta,
+                    accion="INVALIDO",
+                    elemento_afectado="documento.id_documento=1",
+                    origen=OrigenBitacora.USUARIA,
+                )
+
     def test_registrar_crea_fila_a_nombre_de_la_cuenta(self):
         registro = registrar(
             cuenta=self.cuenta,

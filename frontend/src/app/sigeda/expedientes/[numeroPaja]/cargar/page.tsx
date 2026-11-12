@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { use, useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { FechaInput } from "@/components/forms/fecha-input";
 import { Input } from "@/components/ui/input";
 import {
   cargarDocumentos,
@@ -506,15 +507,13 @@ export default function CargarDocumentoPage({
                       >
                         Fecha del documento (oblig.)
                       </label>
-                      <Input
+                      <FechaInput
                         id={`fecha-${fila.id}`}
-                        type="date"
-                        value={fila.fechaDocumento}
-                        onChange={(e) =>
-                          actualizarFila(fila.id, {
-                            fechaDocumento: e.target.value,
-                          })
+                        valorIso={fila.fechaDocumento}
+                        onChangeIso={(iso) =>
+                          actualizarFila(fila.id, { fechaDocumento: iso })
                         }
+                        hasError={Boolean(errorFecha)}
                       />
                       {errorFecha ? (
                         <p className="text-sm text-[var(--color-danger)]">

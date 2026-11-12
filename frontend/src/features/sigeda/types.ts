@@ -64,6 +64,35 @@ export type TipoDocumentoCatalogo = {
   prioridad: number;
 };
 
+export type SectorCatalogo = {
+  id_sector: number;
+  nombre: string;
+};
+
+export type ResultadoBusqueda = {
+  numero_paja: string;
+  titular_vigente: string | null;
+  identificacion_parcial: string | null;
+  sector: string | null;
+  tipo_abonado: "PERSONA_FISICA" | "PERSONA_JURIDICA" | "PENDIENTE";
+  estado: "ACTIVO" | "DE_BAJA";
+};
+
+export type RespuestaBusqueda = {
+  total: number;
+  mostrados: number;
+  tiempo_segundos: number;
+  resultados: ResultadoBusqueda[];
+};
+
+export type CriteriosBusqueda = {
+  numero_paja?: string;
+  nombre?: string;
+  identificacion?: string;
+  id_sector?: number;
+  incluir_baja: boolean;
+};
+
 export type MetadatoArchivo = {
   es_nueva_version: boolean;
   id_documento?: number;

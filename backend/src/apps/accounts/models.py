@@ -38,6 +38,10 @@ class Cuenta(models.Model):
                 condition=Q(intentos_fallidos__gte=0),
                 name="cuenta_intentos_fallidos_no_negativos",
             ),
+            CheckConstraint(
+                condition=Q(perfil__in=PerfilCuenta.values),
+                name="cuenta_perfil_dominio",
+            ),
         ]
 
     def __str__(self):

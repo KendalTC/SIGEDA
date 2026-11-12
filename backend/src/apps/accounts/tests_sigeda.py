@@ -1,6 +1,7 @@
 """RF-01 Autenticar usuario, RNF-09 (bloqueo y contraseña mínima), RF-20."""
 
 from django.contrib.auth.hashers import make_password
+from django.db import IntegrityError, transaction
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -103,3 +104,14 @@ class CambiarContrasenaCuentaTests(TestCase):
         self.assertEqual(respuesta.status_code, 200)
         self.cuenta.refresh_from_db()
         self.assertFalse(self.cuenta.es_contrasena_temporal)
+
+
+class CuentaConstraintsTests(TestCase):
+    def test_perfil_fuera_de_dominio_se_rechaza(self):
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                Cuenta.objects.create(
+                    usuario="invalida",
+                    hash_contrasena=make_password("Correcta2026!"),
+                    perfil="INVALIDO",
+                )

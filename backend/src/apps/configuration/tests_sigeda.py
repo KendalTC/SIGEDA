@@ -41,3 +41,22 @@ class TipoDocumentoConstraintsTests(TestCase):
     def test_grupo_permiso_o_formulario_tiene_dos_tipos(self):
         grupo = GrupoAlternativas.objects.get(nombre="Permiso o formulario")
         self.assertEqual(grupo.tipos_documento.count(), 2)
+
+    def test_obligatoriedad_fuera_de_dominio_se_rechaza(self):
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                TipoDocumento.objects.create(
+                    nombre="Tipo con obligatoriedad inválida",
+                    prioridad=92,
+                    obligatoriedad="INVALIDO",
+                )
+
+
+class GrupoAlternativasConstraintsTests(TestCase):
+    def test_obligatoriedad_fuera_de_dominio_se_rechaza(self):
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                GrupoAlternativas.objects.create(
+                    nombre="Grupo con obligatoriedad inválida",
+                    obligatoriedad="NINGUNA",  # no existe para grupos (obs. 12)
+                )

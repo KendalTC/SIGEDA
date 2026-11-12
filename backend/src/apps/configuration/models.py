@@ -35,6 +35,12 @@ class GrupoAlternativas(models.Model):
     class Meta:
         db_table = "grupo_alternativas"
         ordering = ["nombre"]
+        constraints = [
+            CheckConstraint(
+                condition=Q(obligatoriedad__in=ObligatoriedadGrupo.values),
+                name="grupo_alternativas_obligatoriedad_dominio",
+            ),
+        ]
 
     def __str__(self):
         return self.nombre
@@ -81,6 +87,13 @@ class TipoDocumento(models.Model):
             CheckConstraint(
                 condition=Q(prioridad__gt=0),
                 name="tipo_documento_prioridad_positiva",
+            ),
+            CheckConstraint(
+                condition=(
+                    Q(obligatoriedad__isnull=True)
+                    | Q(obligatoriedad__in=ObligatoriedadTipoDocumento.values)
+                ),
+                name="tipo_documento_obligatoriedad_dominio",
             ),
         ]
 

@@ -356,3 +356,23 @@ class DocumentoConstraintsTests(TestCase):
                     fecha_documento=datetime.date(2026, 1, 1),
                     hash_sha256="0" * 64,
                 )
+
+    def test_version_documento_formato_solo_pdf_o_png(self):
+        """RN-11: solo PDF o PNG (documento.estado ya probado arriba)."""
+
+        documento = Documento.objects.create(
+            abonado=self.abonado, tipo_documento=self.tipo_documento,
+        )
+
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                VersionDocumento.objects.create(
+                    documento=documento,
+                    numero_version=1,
+                    nombre_original="x.jpg",
+                    ruta_archivo="x2.bin",
+                    formato="JPG",
+                    tamano_bytes=100,
+                    fecha_documento=datetime.date(2026, 1, 1),
+                    hash_sha256="0" * 64,
+                )

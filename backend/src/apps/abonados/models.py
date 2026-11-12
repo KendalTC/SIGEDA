@@ -1,5 +1,6 @@
 from django.contrib.postgres.constraints import ExclusionConstraint
 from django.contrib.postgres.fields import DateRangeField, RangeOperators
+from django.contrib.postgres.indexes import GinIndex
 from django.db import models
 from django.db.models import CheckConstraint, F, Func, Q, UniqueConstraint, Value
 
@@ -73,12 +74,25 @@ class Abonado(models.Model):
         db_table = "abonado"
         ordering = ["numero_paja"]
         constraints = [
+            # estado ya queda restringido a ACTIVO/DE_BAJA como efecto
+            # lateral de este CHECK compuesto (ninguna otra rama lo
+            # permite): no hace falta un CHECK aparte solo para el dominio.
             CheckConstraint(
                 condition=(
                     Q(estado=EstadoAbonado.DE_BAJA, fecha_baja__isnull=False)
                     | Q(estado=EstadoAbonado.ACTIVO, fecha_baja__isnull=True)
                 ),
                 name="abonado_de_baja_tiene_fecha_baja",
+            ),
+            CheckConstraint(
+                condition=Q(tipo_abonado__in=TipoAbonado.values),
+                name="abonado_tipo_abonado_dominio",
+            ),
+            # RN-01 y Anexo B (Prototipos v1.1): solo dígitos, puede
+            # empezar con cero, nunca se reutiliza.
+            CheckConstraint(
+                condition=Q(numero_paja__regex=r"^[0-9]+$"),
+                name="abonado_numero_paja_solo_digitos",
             ),
         ]
 
@@ -110,6 +124,15 @@ class Persona(models.Model):
     class Meta:
         db_table = "persona"
         ordering = ["nombre"]
+        indexes = [
+            # RF-10/Q1, RNF-05, ADR-06: búsqueda por nombre insensible a
+            # errores de tecleo, con pg_trgm.
+            GinIndex(
+                name="persona_nombre_trigram_idx",
+                fields=["nombre"],
+                opclasses=["gin_trgm_ops"],
+            ),
+        ]
         constraints = [
             CheckConstraint(
                 condition=(
@@ -117,6 +140,13 @@ class Persona(models.Model):
                     | Q(tipo_identificacion__isnull=False, identificacion__isnull=False)
                 ),
                 name="persona_identificacion_completa_o_vacia",
+            ),
+            CheckConstraint(
+                condition=(
+                    Q(tipo_identificacion__isnull=True)
+                    | Q(tipo_identificacion__in=TipoIdentificacion.values)
+                ),
+                name="persona_tipo_identificacion_dominio",
             ),
             UniqueConstraint(
                 fields=["tipo_identificacion", "identificacion"],
@@ -166,6 +196,10 @@ class VinculoAbonado(models.Model):
                     Q(fecha_fin__isnull=True) | Q(fecha_fin__gte=F("fecha_inicio"))
                 ),
                 name="vinculo_abonado_fecha_fin_no_anterior",
+            ),
+            CheckConstraint(
+                condition=Q(rol__in=RolVinculo.values),
+                name="vinculo_abonado_rol_dominio",
             ),
             UniqueConstraint(
                 fields=["abonado"],

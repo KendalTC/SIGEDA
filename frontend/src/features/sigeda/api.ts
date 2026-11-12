@@ -8,9 +8,12 @@ import {
 import type {
   CargaDocumentosError,
   CargaDocumentosExito,
+  CriteriosBusqueda,
   Cuenta,
   Expediente,
   MetadatoArchivo,
+  RespuestaBusqueda,
+  SectorCatalogo,
   TipoDocumentoCatalogo,
 } from "./types";
 
@@ -99,6 +102,32 @@ export function obtenerExpediente(token: string, numeroPaja: string) {
 export function listarTiposDocumento(token: string) {
   return sigedaFetch<TipoDocumentoCatalogo[]>(
     "/api/sigeda/catalogos/tipos-documento/",
+    { token },
+  );
+}
+
+export function listarSectores(token: string) {
+  return sigedaFetch<SectorCatalogo[]>(
+    "/api/sigeda/catalogos/sectores/",
+    { token },
+  );
+}
+
+export function buscarExpedientes(token: string, criterios: CriteriosBusqueda) {
+  const params = new URLSearchParams();
+
+  if (criterios.numero_paja) params.set("numero_paja", criterios.numero_paja);
+  if (criterios.nombre) params.set("nombre", criterios.nombre);
+  if (criterios.identificacion) {
+    params.set("identificacion", criterios.identificacion);
+  }
+  if (criterios.id_sector) {
+    params.set("id_sector", String(criterios.id_sector));
+  }
+  params.set("incluir_baja", String(criterios.incluir_baja));
+
+  return sigedaFetch<RespuestaBusqueda>(
+    `/api/sigeda/abonados/buscar/?${params.toString()}`,
     { token },
   );
 }

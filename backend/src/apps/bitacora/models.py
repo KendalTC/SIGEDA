@@ -58,12 +58,18 @@ class RegistroBitacora(models.Model):
         db_table = "registro_bitacora"
         ordering = ["-fecha_hora", "-id_registro_bitacora"]
         constraints = [
+            # origen ya queda restringido a USUARIA/SISTEMA como efecto
+            # lateral de este CHECK compuesto: no hace falta uno aparte.
             CheckConstraint(
                 condition=(
                     Q(origen=OrigenBitacora.USUARIA, cuenta__isnull=False)
                     | Q(origen=OrigenBitacora.SISTEMA, cuenta__isnull=True)
                 ),
                 name="registro_bitacora_origen_usuaria_tiene_cuenta",
+            ),
+            CheckConstraint(
+                condition=Q(accion__in=AccionBitacora.values),
+                name="registro_bitacora_accion_dominio",
             ),
         ]
 

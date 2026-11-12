@@ -1,6 +1,7 @@
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.abonados.models import Sector
 from apps.accounts.sigeda_auth import AutenticacionCuenta, CuentaAutenticadaPermission
 
 from .models import TipoDocumento
@@ -23,5 +24,22 @@ class TiposDocumentoView(APIView):
                     "prioridad": tipo.prioridad,
                 }
                 for tipo in tipos
+            ],
+        )
+
+
+class SectoresView(APIView):
+    """Catálogo de sectores, para el filtro de PAN-03."""
+
+    authentication_classes = [AutenticacionCuenta]
+    permission_classes = [CuentaAutenticadaPermission]
+
+    def get(self, request):
+        sectores = Sector.objects.order_by("nombre")
+
+        return Response(
+            [
+                {"id_sector": sector.id_sector, "nombre": sector.nombre}
+                for sector in sectores
             ],
         )

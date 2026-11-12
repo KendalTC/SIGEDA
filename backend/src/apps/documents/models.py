@@ -120,6 +120,10 @@ class VersionDocumento(models.Model):
         ordering = ["documento_id", "numero_version"]
         constraints = [
             CheckConstraint(
+                condition=Q(formato__in=FormatoVersionDocumento.values),
+                name="version_documento_formato_dominio",
+            ),
+            CheckConstraint(
                 condition=Q(tamano_bytes__gt=0),
                 name="version_documento_tamano_bytes_positivo",
             ),

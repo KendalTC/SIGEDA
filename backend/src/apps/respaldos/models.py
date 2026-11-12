@@ -63,6 +63,14 @@ class Respaldo(models.Model):
                 condition=Q(tamano_bytes__isnull=True) | Q(tamano_bytes__gt=0),
                 name="respaldo_tamano_bytes_positivo",
             ),
+            CheckConstraint(
+                condition=Q(tipo__in=TipoRespaldo.values),
+                name="respaldo_tipo_dominio",
+            ),
+            CheckConstraint(
+                condition=Q(estado__in=EstadoRespaldo.values),
+                name="respaldo_estado_dominio",
+            ),
         ]
 
     def __str__(self):
@@ -92,6 +100,16 @@ class CopiaRespaldo(models.Model):
     class Meta:
         db_table = "copia_respaldo"
         ordering = ["respaldo_id", "destino"]
+        constraints = [
+            CheckConstraint(
+                condition=Q(destino__in=DestinoCopiaRespaldo.values),
+                name="copia_respaldo_destino_dominio",
+            ),
+            CheckConstraint(
+                condition=Q(estado__in=EstadoCopiaRespaldo.values),
+                name="copia_respaldo_estado_dominio",
+            ),
+        ]
 
     def __str__(self):
         return f"{self.respaldo_id} · {self.destino}"

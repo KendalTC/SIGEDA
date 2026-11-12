@@ -10,6 +10,7 @@ from apps.accounts.sigeda_auth import AutenticacionCuenta, CuentaAutenticadaPerm
 from apps.documents.repositorio import RepositorioDocumentos
 from apps.documents.serializers import DocumentoExpedienteSerializer
 
+from . import controlador_busqueda
 from .models import Abonado, VinculoAbonado
 from .serializers import AbonadoSerializer, VinculoAbonadoSerializer
 
@@ -58,5 +59,58 @@ class ExpedienteView(APIView):
                 "documentos": DocumentoExpedienteSerializer(
                     documentos, many=True,
                 ).data,
+            },
+        )
+
+
+class BuscarAbonadosView(APIView):
+    """RF-10 Buscar expedientes (consulta Q1), para PAN-03."""
+
+    authentication_classes = [AutenticacionCuenta]
+    permission_classes = [CuentaAutenticadaPermission]
+
+    def get(self, request):
+        numero_paja = request.query_params.get("numero_paja")
+        nombre = request.query_params.get("nombre")
+        identificacion = request.query_params.get("identificacion")
+        id_sector = request.query_params.get("id_sector")
+        incluir_baja = request.query_params.get("incluir_baja", "true") != "false"
+
+        if not any([numero_paja, nombre, identificacion, id_sector]):
+            return Response(
+                {
+                    "detail": (
+                        "Escriba al menos un criterio de búsqueda: número "
+                        "de paja, nombre, identificación o sector."
+                    ),
+                },
+                status=400,
+            )
+
+        if id_sector is not None and not id_sector.isdigit():
+            return Response(
+                {
+                    "detail": (
+                        f"El sector «{id_sector}» no es válido. Elija un "
+                        f"sector de la lista."
+                    ),
+                },
+                status=400,
+            )
+
+        resultado = controlador_busqueda.buscar(
+            numero_paja=numero_paja,
+            nombre=nombre,
+            identificacion=identificacion,
+            id_sector=int(id_sector) if id_sector else None,
+            incluir_baja=incluir_baja,
+        )
+
+        return Response(
+            {
+                "total": resultado.total,
+                "mostrados": resultado.mostrados,
+                "tiempo_segundos": resultado.tiempo_segundos,
+                "resultados": resultado.resultados,
             },
         )
