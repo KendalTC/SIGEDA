@@ -29,6 +29,10 @@ pnpm-debug.log*
 # Backups and database exports
 backups/
 *.sql
+# Entregable real: el DDL del Modelo ER v1.1 sí va al repo (CLAUDE.md,
+# sección 10). Sin esta excepción, el *.sql de arriba se lo comía en
+# silencio y nunca llegó a GitHub.
+!/db/ddl/*.sql
 
 # Archivos DBF legacy reales del cliente (datos de negocio, no van al repo)
 backend/legacy_data/
