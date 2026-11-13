@@ -6,7 +6,10 @@ heredada de LICS, intacta).
 """
 
 import json
+import shutil
+from pathlib import Path
 
+from django.conf import settings
 from django.db import transaction
 from django.http import HttpResponse
 from django.utils import timezone
@@ -458,3 +461,145 @@ class DescargarVersionDocumentoView(APIView):
         )
 
         return respuesta
+
+
+class ExportarDocumentosView(APIView):
+    """
+    PAN-12 Exportar (RF-18, RN-10): copia a una carpeta del entorno,
+    ya descifradas, las versiones VIGENTES de los documentos elegidos
+    de un expediente. «Imprimir» reusa el endpoint de descarga que ya
+    existe arriba (`DescargarVersionDocumentoView`); no hace falta un
+    endpoint aparte para eso.
+    """
+
+    authentication_classes = [AutenticacionCuenta]
+    permission_classes = [CuentaAutenticadaPermission]
+
+    def post(self, request):
+        numero_paja = (request.data.get("numero_paja") or "").strip()
+
+        if not numero_paja:
+            return Response(
+                {"numero_paja": ["El número de paja es obligatorio."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            abonado = Abonado.objects.get(numero_paja=numero_paja)
+        except Abonado.DoesNotExist:
+            return Response(
+                {
+                    "numero_paja": [
+                        f"No existe un expediente con el número de paja "
+                        f"{numero_paja}.",
+                    ],
+                },
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        ids_documento_bruto = request.data.get("ids_documento") or []
+
+        if not isinstance(ids_documento_bruto, list) or not ids_documento_bruto:
+            return Response(
+                {"ids_documento": ["Elija al menos un documento para exportar."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            ids_documento = [int(valor) for valor in ids_documento_bruto]
+        except (TypeError, ValueError):
+            return Response(
+                {"ids_documento": ["Hay un documento inválido en la lista."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        ids_documento_unicos = set(ids_documento)
+        documentos = list(
+            Documento.objects.filter(
+                pk__in=ids_documento_unicos, abonado=abonado,
+            ),
+        )
+
+        if len(documentos) != len(ids_documento_unicos):
+            return Response(
+                {
+                    "ids_documento": [
+                        "Alguno de los documentos elegidos no existe en "
+                        "este expediente.",
+                    ],
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not settings.SIGEDA_EXPORT_DIR:
+            return Response(
+                {
+                    "detail": (
+                        "No hay una carpeta de exportación configurada. "
+                        "Avise a soporte técnico."
+                    ),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        fecha_hoy = timezone.localdate().strftime("%Y%m%d")
+        directorio = Path(settings.SIGEDA_EXPORT_DIR) / f"{numero_paja}_{fecha_hoy}"
+        almacen = AlmacenArchivosCifrados()
+        exportados = []
+
+        try:
+            directorio.mkdir(parents=True, exist_ok=True)
+
+            for documento in documentos:
+                version = documento.obtener_version_vigente()
+
+                if version is None:
+                    continue
+
+                contenido = almacen.leer_archivo(version.ruta_archivo)
+                (directorio / version.nombre_original).write_bytes(contenido)
+                exportados.append(documento)
+        except OSError as error:
+            # Nada de archivos parciales: si algo falla a mitad, se
+            # borra el directorio completo que se acababa de crear.
+            shutil.rmtree(directorio, ignore_errors=True)
+
+            return Response(
+                {
+                    "detail": (
+                        f"No se pudo copiar a la carpeta {directorio}: "
+                        f"{error}. Elija otra carpeta o libere espacio y "
+                        "vuelva a exportar. No se copió ningún archivo."
+                    ),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        with transaction.atomic():
+            registro = registrar(
+                cuenta=request.user,
+                accion=AccionBitacora.EXPORTACION,
+                elemento_afectado=f"exportacion.numero_paja={numero_paja}",
+                id_abonado=abonado.id_abonado,
+            )
+            registrar_modificaciones(
+                registro,
+                {
+                    "exportacion.resumen": (
+                        None,
+                        f"{len(exportados)} documento(s) exportado(s) a "
+                        f"{directorio}",
+                    ),
+                },
+            )
+
+        return Response(
+            {
+                "detail": (
+                    f"Se exportaron {len(exportados)} documentos a "
+                    f"{directorio}."
+                ),
+                "ruta": str(directorio),
+                "cantidad": len(exportados),
+            },
+        )

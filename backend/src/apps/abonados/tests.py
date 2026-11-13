@@ -29,9 +29,22 @@ from .importacion.lectores import (
     LectorArchivoTexto,
     elegir_lector,
 )
-from .models import Abonado, Persona, RolVinculo, Sector, TipoAbonado, VinculoAbonado
+from .models import (
+    Abonado,
+    EstadoAbonado,
+    Persona,
+    RolVinculo,
+    Sector,
+    TipoAbonado,
+    VinculoAbonado,
+)
 from .serializers import AbonadoSerializer
-from .servicio_completitud import calcular_completitud
+from .servicio_completitud import (
+    calcular_completitud,
+    listar_incompletos,
+    listar_tipo_pendiente,
+    resumen_completitud_global,
+)
 
 
 class AbonadoConstraintsTests(TestCase):
@@ -619,6 +632,228 @@ class CompletitudAbonadoTests(TestCase):
 
         resultado = calcular_completitud(self.abonado)
         self.assertIn("Plano legible (titular)", resultado["faltantes"])
+
+
+class ResumenCompletitudGlobalTests(TestCase):
+    """
+    PAN-07 (RF-14): tarjetas globales (`resumen_completitud_global`) y
+    lista de incompletos (`listar_incompletos`). Los abonados de baja
+    no cuentan en los totales (confirmado, CLAUDE.md sección 9).
+    """
+
+    TIPOS_PERSONA_FISICA = CompletitudAbonadoTests.TIPOS_PERSONA_FISICA
+
+    def _abonado_completo(self, numero_paja, *, id_sector=None):
+        abonado = Abonado.objects.create(
+            numero_paja=numero_paja,
+            tipo_abonado=TipoAbonado.PERSONA_FISICA,
+            sector_id=id_sector,
+        )
+        titular = Persona.objects.create(nombre=f"Titular completo {numero_paja}")
+        VinculoAbonado.objects.create(
+            abonado=abonado,
+            persona=titular,
+            fecha_inicio=datetime.date(2020, 1, 1),
+            rol="TITULAR",
+        )
+        for nombre in self.TIPOS_PERSONA_FISICA:
+            Documento.objects.create(
+                abonado=abonado,
+                tipo_documento=TipoDocumento.objects.get(nombre=nombre),
+                persona=titular,
+                estado="VIGENTE",
+            )
+        return abonado
+
+    def _abonado_incompleto(self, numero_paja, *, id_sector=None):
+        abonado = Abonado.objects.create(
+            numero_paja=numero_paja,
+            tipo_abonado=TipoAbonado.PERSONA_FISICA,
+            sector_id=id_sector,
+        )
+        titular = Persona.objects.create(nombre=f"Titular incompleto {numero_paja}")
+        VinculoAbonado.objects.create(
+            abonado=abonado,
+            persona=titular,
+            fecha_inicio=datetime.date(2020, 1, 1),
+            rol="TITULAR",
+        )
+        return abonado
+
+    def setUp(self):
+        self.sector_bodegas = Sector.objects.create(nombre="Bodegas de prueba RCG")
+        self.sector_pilas = Sector.objects.create(nombre="Pilas de prueba RCG")
+
+        self.completo_1 = self._abonado_completo(
+            "9701", id_sector=self.sector_bodegas.id_sector,
+        )
+        self.completo_2 = self._abonado_completo(
+            "9702", id_sector=self.sector_pilas.id_sector,
+        )
+        self.incompleto_1 = self._abonado_incompleto(
+            "9703", id_sector=self.sector_bodegas.id_sector,
+        )
+
+        self.pendiente = Abonado.objects.create(
+            numero_paja="9704", tipo_abonado=TipoAbonado.PENDIENTE,
+        )
+        Persona.objects.create(nombre="Titular pendiente 9704")
+        VinculoAbonado.objects.create(
+            abonado=self.pendiente,
+            persona=Persona.objects.get(nombre="Titular pendiente 9704"),
+            fecha_inicio=datetime.date(2026, 1, 5),
+            rol="TITULAR",
+        )
+
+        self.de_baja = Abonado.objects.create(
+            numero_paja="9705",
+            tipo_abonado=TipoAbonado.PERSONA_FISICA,
+            estado=EstadoAbonado.DE_BAJA,
+            fecha_baja=datetime.date(2026, 1, 1),
+        )
+
+    def test_de_baja_no_cuenta_en_los_totales(self):
+        resumen = resumen_completitud_global()
+
+        self.assertEqual(resumen["completos"], 2)
+        self.assertEqual(resumen["incompletos"], 1)
+        self.assertEqual(resumen["tipo_pendiente"], 1)
+        self.assertEqual(resumen["total_activos"], 4)
+
+    def test_avance_pct_se_calcula_sobre_el_total_activo(self):
+        resumen = resumen_completitud_global()
+
+        self.assertAlmostEqual(resumen["avance_pct"], 50.0)
+
+    def test_avance_pct_cero_sin_abonados_activos(self):
+        # Un sector sin abonados (en vez de borrar: todas las FK hacia
+        # abonado son RESTRICT, Modelo ER v1.1).
+        sector_vacio = Sector.objects.create(nombre="Sector sin abonados RCG")
+
+        self.assertEqual(
+            resumen_completitud_global({"id_sector": sector_vacio.id_sector}),
+            {
+                "completos": 0,
+                "incompletos": 0,
+                "tipo_pendiente": 0,
+                "total_activos": 0,
+                "avance_pct": 0.0,
+            },
+        )
+
+    def test_filtro_por_sector(self):
+        resumen = resumen_completitud_global(
+            {"id_sector": self.sector_bodegas.id_sector},
+        )
+
+        # Bodegas: completo_1 (completo) + incompleto_1 (incompleto).
+        self.assertEqual(resumen["completos"], 1)
+        self.assertEqual(resumen["incompletos"], 1)
+        self.assertEqual(resumen["tipo_pendiente"], 0)
+        self.assertEqual(resumen["total_activos"], 2)
+
+    def test_filtro_por_tipo_abonado(self):
+        resumen = resumen_completitud_global(
+            {"tipo_abonado": TipoAbonado.PENDIENTE},
+        )
+
+        self.assertEqual(resumen["tipo_pendiente"], 1)
+        self.assertEqual(resumen["completos"], 0)
+        self.assertEqual(resumen["incompletos"], 0)
+
+    def test_listar_incompletos_solo_devuelve_incompletos_activos(self):
+        incompletos = listar_incompletos()
+
+        pajas = {fila["numero_paja"] for fila in incompletos}
+        self.assertEqual(pajas, {"9703"})
+
+        fila = incompletos[0]
+        self.assertEqual(fila["tipo_abonado"], TipoAbonado.PERSONA_FISICA)
+        self.assertIn("Plano legible (titular)", fila["faltantes"])
+
+    def test_listar_incompletos_filtra_por_sector(self):
+        incompletos = listar_incompletos({"id_sector": self.sector_pilas.id_sector})
+        self.assertEqual(incompletos, [])
+
+    def test_listar_incompletos_filtra_por_tipo_abonado(self):
+        incompletos = listar_incompletos(
+            {"tipo_abonado": TipoAbonado.PERSONA_JURIDICA},
+        )
+        self.assertEqual(incompletos, [])
+
+    def test_listar_incompletos_filtra_por_documento_faltante(self):
+        con_filtro = listar_incompletos({"documento_faltante": "Plano legible"})
+        self.assertEqual({fila["numero_paja"] for fila in con_filtro}, {"9703"})
+
+        sin_coincidencia = listar_incompletos(
+            {"documento_faltante": "Cédula jurídica"},
+        )
+        self.assertEqual(sin_coincidencia, [])
+
+    def test_listar_tipo_pendiente(self):
+        pendientes = listar_tipo_pendiente()
+
+        self.assertEqual(len(pendientes), 1)
+        self.assertEqual(pendientes[0]["numero_paja"], "9704")
+        self.assertEqual(pendientes[0]["titular_vigente"], "Titular pendiente 9704")
+        self.assertEqual(pendientes[0]["fecha_inicio"], datetime.date(2026, 1, 5))
+
+
+class PanelCompletitudViewTests(TestCase):
+    """PAN-07 (RF-14): vistas HTTP del panel y del detalle."""
+
+    def setUp(self):
+        self.cuenta = Cuenta.objects.create(
+            usuario="secretaria_completitud",
+            hash_contrasena=make_password("Prueba2026!"),
+            perfil="SECRETARIA",
+        )
+        token = TokenCuenta.objects.create(cuenta=self.cuenta)
+        self.cliente = APIClient()
+        self.cliente.credentials(HTTP_AUTHORIZATION=f"Bearer {token.key}")
+
+        self.abonado = Abonado.objects.create(
+            numero_paja="9710", tipo_abonado=TipoAbonado.PERSONA_FISICA,
+        )
+        self.titular = Persona.objects.create(nombre="Titular panel completitud")
+        VinculoAbonado.objects.create(
+            abonado=self.abonado,
+            persona=self.titular,
+            fecha_inicio=datetime.date(2020, 1, 1),
+            rol="TITULAR",
+        )
+
+    def test_panel_completitud_responde_las_tres_secciones(self):
+        respuesta = self.cliente.get(reverse("abonados:completitud"))
+
+        self.assertEqual(respuesta.status_code, 200, respuesta.data)
+        self.assertIn("tarjetas", respuesta.data)
+        self.assertIn("incompletos", respuesta.data)
+        self.assertIn("tipo_pendiente", respuesta.data)
+        self.assertIn("9710", {fila["numero_paja"] for fila in respuesta.data["incompletos"]})
+
+    def test_detalle_completitud_abonado_trae_matriz(self):
+        respuesta = self.cliente.get(
+            reverse("abonados:completitud_detalle", args=["9710"]),
+        )
+
+        self.assertEqual(respuesta.status_code, 200, respuesta.data)
+        self.assertFalse(respuesta.data["completo"])
+        self.assertIsInstance(respuesta.data["matriz"], list)
+        self.assertTrue(len(respuesta.data["matriz"]) > 0)
+
+        fila_plano = next(
+            fila for fila in respuesta.data["matriz"] if fila["nombre"] == "Plano legible"
+        )
+        self.assertEqual(len(fila_plano["columnas"]), 1)
+        self.assertEqual(fila_plano["columnas"][0]["rol"], "titular")
+        self.assertFalse(fila_plano["columnas"][0]["tiene_documento"])
+
+    def test_detalle_completitud_abonado_inexistente(self):
+        respuesta = self.cliente.get(
+            reverse("abonados:completitud_detalle", args=["0000"]),
+        )
+        self.assertEqual(respuesta.status_code, 404)
 
 
 class ExpedienteExtendidoViewTests(TestCase):

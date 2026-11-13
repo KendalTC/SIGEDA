@@ -40,6 +40,7 @@ services:
       - ../../backend:/app
       - sigeda_documentos_cifrados:/app/almacen_cifrado
       - sigeda_respaldos:/app/respaldos
+      - sigeda_exportaciones:/app/exportaciones
     command:
       - sh
       - -c
@@ -123,6 +124,7 @@ volumes:
   frontend_node_modules:
   sigeda_documentos_cifrados:
   sigeda_respaldos:
+  sigeda_exportaciones:
 
 networks:
   application:

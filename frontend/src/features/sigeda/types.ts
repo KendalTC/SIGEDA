@@ -365,3 +365,205 @@ export type ResultadoImportacion = {
  * elija para "Número de paja" y para "Nombre del titular" es lo que se
  * manda como `columna_paja`/`columna_nombre`; el resto son "No se usa". */
 export type UsoColumnaImportacion = "PAJA" | "NOMBRE" | "NO_USA";
+
+// --- RF-09 Tipos de documento y grupos de alternativas (PAN-10) ------
+
+export type ObligatoriedadTipoDocumento =
+  | "PERSONA_FISICA"
+  | "PERSONA_JURIDICA"
+  | "AMBAS"
+  | "NINGUNA";
+
+/** `grupo_alternativas.obligatoriedad` nunca es NINGUNA (Modelo ER v1.1). */
+export type ObligatoriedadGrupo = "PERSONA_FISICA" | "PERSONA_JURIDICA" | "AMBAS";
+
+export type GrupoAlternativasResumen = {
+  id_grupo_alternativas: number;
+  nombre: string;
+};
+
+/** `GET /api/sigeda/tipos-documento/`: cada tipo trae una de las dos
+ * cosas, nunca las dos (CHECK del Modelo ER v1.1). */
+export type TipoDocumentoAdmin = {
+  id_tipo_documento: number;
+  nombre: string;
+  prioridad: number;
+  obligatoriedad?: ObligatoriedadTipoDocumento;
+  grupo_alternativas?: GrupoAlternativasResumen;
+  es_exigido_a_cotitulares: boolean;
+};
+
+export type ModoTipoDocumento = "GRUPO" | "OBLIGATORIEDAD";
+
+export type DatosTipoDocumento = {
+  nombre: string;
+  prioridad: number;
+  modo: ModoTipoDocumento;
+  id_grupo_alternativas?: number;
+  obligatoriedad?: ObligatoriedadTipoDocumento;
+  es_exigido_a_cotitulares: boolean;
+};
+
+export type TipoDocumentoDeGrupo = {
+  id_tipo_documento: number;
+  nombre: string;
+};
+
+/** `GET /api/sigeda/grupos-alternativas/`. */
+export type GrupoAlternativas = {
+  id_grupo_alternativas: number;
+  nombre: string;
+  obligatoriedad: ObligatoriedadGrupo;
+  tipos_documento: TipoDocumentoDeGrupo[];
+};
+
+export type DatosGrupoAlternativas = {
+  nombre: string;
+  obligatoriedad: ObligatoriedadGrupo;
+  ids_tipos_documento: number[];
+};
+
+// --- RF-14 Completitud (PAN-07) ---------------------------------------
+
+export type TarjetasCompletitud = {
+  completos: number;
+  incompletos: number;
+  tipo_pendiente: number;
+  total_activos: number;
+  avance_pct: number;
+};
+
+export type AbonadoIncompleto = {
+  numero_paja: string;
+  titular_vigente: string | null;
+  sector: string | null;
+  tipo_abonado: "PERSONA_FISICA" | "PERSONA_JURIDICA" | "PENDIENTE";
+  faltantes: string[];
+};
+
+export type AbonadoTipoPendiente = {
+  numero_paja: string;
+  titular_vigente: string | null;
+  fecha_inicio: string | null;
+};
+
+/** `GET /api/sigeda/abonados/completitud/` (`PanelCompletitudView`,
+ * `backend/.../abonados/views.py`). Con `mostrar_de_baja=true` el
+ * backend NO agrega filas a `incompletos`/`tipo_pendiente` (esas listas
+ * siempre son solo de abonados ACTIVOS): solo suma el campo `de_baja`
+ * con el conteo. */
+export type RespuestaCompletitud = {
+  tarjetas: TarjetasCompletitud;
+  incompletos: AbonadoIncompleto[];
+  tipo_pendiente: AbonadoTipoPendiente[];
+  de_baja?: { cantidad: number };
+};
+
+export type FiltrosCompletitud = {
+  id_sector?: number;
+  tipo_abonado?: "PERSONA_FISICA" | "PERSONA_JURIDICA" | "PENDIENTE";
+  documento_faltante?: string;
+  mostrar_de_baja?: boolean;
+};
+
+/** `GET /api/sigeda/abonados/{numeroPaja}/completitud/`
+ * (`DetalleCompletitudAbonadoView`): matriz Documento/grupo × persona.
+ * `aplica=false` marca una columna que no corresponde a esa fila (p. ej.
+ * un tipo que no se exige a cotitulares, para la columna de un
+ * cotitular): ahí `tiene_documento` viene `null`. */
+export type ColumnaDetalleCompletitud = {
+  id_persona: number;
+  nombre: string;
+  rol: "titular" | "cotitular";
+  aplica: boolean;
+  tiene_documento: boolean | null;
+};
+
+export type FilaDetalleCompletitud = {
+  nombre: string;
+  es_grupo: boolean;
+  columnas: ColumnaDetalleCompletitud[];
+};
+
+export type DetalleCompletitud = {
+  numero_paja: string;
+  tipo_abonado: "PERSONA_FISICA" | "PERSONA_JURIDICA" | "PENDIENTE";
+  completo: boolean;
+  faltantes: string[];
+  matriz: FilaDetalleCompletitud[];
+};
+
+// --- RF-15 Bitácora (PAN-11) -------------------------------------------
+
+export type AccionBitacora =
+  | "CREACION"
+  | "MODIFICACION"
+  | "ANULACION"
+  | "CAMBIO_TITULAR"
+  | "BAJA"
+  | "REACTIVACION"
+  | "IMPORTACION"
+  | "EXPORTACION"
+  | "RESPALDO"
+  | "RESTAURACION"
+  | "RESTABLECIMIENTO_CONTRASENA"
+  | "CUARENTENA";
+
+/** Mismas 12 etiquetas que `AccionBitacora` (`backend/.../bitacora/models.py`). */
+export const ETIQUETAS_ACCION_BITACORA: Record<AccionBitacora, string> = {
+  CREACION: "Creación",
+  MODIFICACION: "Modificación",
+  ANULACION: "Anulación",
+  CAMBIO_TITULAR: "Cambio de titular",
+  BAJA: "Baja",
+  REACTIVACION: "Reactivación",
+  IMPORTACION: "Importación",
+  EXPORTACION: "Exportación",
+  RESPALDO: "Respaldo",
+  RESTAURACION: "Restauración",
+  RESTABLECIMIENTO_CONTRASENA: "Restablecimiento de contraseña",
+  CUARENTENA: "Cuarentena",
+};
+
+export type ModificacionBitacora = {
+  campo: string;
+  valor_anterior: string | null;
+  valor_nuevo: string | null;
+};
+
+export type CuentaBitacora = "secretaria" | "administracion" | "Sistema";
+
+export type RegistroBitacoraFila = {
+  id_registro_bitacora: number;
+  fecha_hora: string;
+  cuenta: CuentaBitacora;
+  accion: AccionBitacora;
+  elemento_afectado: string;
+  numero_paja: string | null;
+  tipo_documento: string | null;
+  modificaciones: ModificacionBitacora[];
+};
+
+/** `GET /api/sigeda/bitacora/`. */
+export type RespuestaBitacora = {
+  total: number;
+  resultados: RegistroBitacoraFila[];
+};
+
+export type FiltrosBitacora = {
+  usuario?: "secretaria" | "administracion";
+  desde?: string;
+  hasta?: string;
+  numero_paja?: string;
+  accion?: AccionBitacora;
+  limit?: number;
+  offset?: number;
+};
+
+// --- RF-18 Exportar documentos (PAN-12) ---------------------------------
+
+export type ResultadoExportacion = {
+  detail: string;
+  ruta: string;
+  cantidad: number;
+};

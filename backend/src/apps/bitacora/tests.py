@@ -1,12 +1,19 @@
+import datetime
+
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
 from django.db import IntegrityError, connection, transaction
 from django.test import TestCase
+from django.urls import reverse
+from rest_framework.test import APIClient
 
-from apps.accounts.models import Cuenta
+from apps.abonados.models import Abonado, Persona, RolVinculo, TipoAbonado, VinculoAbonado
+from apps.accounts.models import Cuenta, TokenCuenta
+from apps.configuration.models import TipoDocumento
+from apps.documents.models import Documento
 
 from .models import AccionBitacora, OrigenBitacora, RegistroBitacora
-from .servicio import registrar
+from .servicio import registrar, registrar_modificaciones
 
 
 class RegistroBitacoraConstraintsTests(TestCase):
@@ -168,3 +175,176 @@ class RevocarUpdateDeleteBitacoraTests(TestCase):
                         [registro.id_registro_bitacora],
                     )
         self.assertIn("permission denied", str(contexto_delete.exception).lower())
+
+
+class ConsultarBitacoraViewTests(TestCase):
+    """PAN-11 (RF-15): filtros de usuario, fechas, número de paja y
+    acción; resolución en lote de numero_paja/tipo_documento (sin N+1)."""
+
+    def setUp(self):
+        self.cuenta_secretaria = Cuenta.objects.create(
+            usuario="secretaria_bitacora",
+            hash_contrasena=make_password("Prueba2026!"),
+            perfil="SECRETARIA",
+        )
+        self.cuenta_administracion = Cuenta.objects.create(
+            usuario="administracion_bitacora",
+            hash_contrasena=make_password("Prueba2026!"),
+            perfil="ADMINISTRADORA",
+        )
+        token = TokenCuenta.objects.create(cuenta=self.cuenta_secretaria)
+        self.cliente = APIClient()
+        self.cliente.credentials(HTTP_AUTHORIZATION=f"Bearer {token.key}")
+
+        self.abonado = Abonado.objects.create(
+            numero_paja="9720", tipo_abonado=TipoAbonado.PERSONA_FISICA,
+        )
+        self.titular = Persona.objects.create(nombre="Titular bitácora prueba")
+        VinculoAbonado.objects.create(
+            abonado=self.abonado,
+            persona=self.titular,
+            fecha_inicio=datetime.date(2020, 1, 1),
+            rol=RolVinculo.TITULAR,
+        )
+        self.tipo_documento = TipoDocumento.objects.get(nombre="Plano legible")
+        self.documento = Documento.objects.create(
+            abonado=self.abonado,
+            tipo_documento=self.tipo_documento,
+            persona=self.titular,
+            estado="VIGENTE",
+        )
+
+        # Evento 1: CREACION de documento, a nombre de secretaria, hoy.
+        self.registro_creacion = registrar(
+            cuenta=self.cuenta_secretaria,
+            accion=AccionBitacora.CREACION,
+            elemento_afectado=f"documento.id_documento={self.documento.id_documento}",
+            id_abonado=self.abonado.id_abonado,
+        )
+
+        # Evento 2: MODIFICACION del abonado, a nombre de administración,
+        # hace 10 días.
+        self.registro_modificacion = registrar(
+            cuenta=self.cuenta_administracion,
+            accion=AccionBitacora.MODIFICACION,
+            elemento_afectado=f"abonado.id_abonado={self.abonado.id_abonado}",
+            id_abonado=self.abonado.id_abonado,
+        )
+        registrar_modificaciones(
+            self.registro_modificacion,
+            {"abonado.tipo_abonado": ("PENDIENTE", "PERSONA_FISICA")},
+        )
+        fecha_antigua = (
+            datetime.datetime.now(datetime.timezone.utc)
+            - datetime.timedelta(days=10)
+        )
+        RegistroBitacora.objects.filter(pk=self.registro_modificacion.pk).update(
+            fecha_hora=fecha_antigua,
+        )
+        self.registro_modificacion.refresh_from_db()
+
+        # Evento 3: RESPALDO de sistema, sin cuenta ni abonado.
+        self.registro_sistema = registrar(
+            cuenta=None, accion=AccionBitacora.RESPALDO,
+            elemento_afectado="respaldo.id_respaldo=1",
+        )
+
+    def test_filtro_por_usuario(self):
+        respuesta = self.cliente.get(
+            reverse("sigeda_bitacora:consultar"),
+            {"usuario": "secretaria_bitacora"},
+        )
+        self.assertEqual(respuesta.status_code, 200, respuesta.data)
+        self.assertEqual(respuesta.data["total"], 1)
+        self.assertEqual(
+            respuesta.data["resultados"][0]["id_registro_bitacora"],
+            self.registro_creacion.id_registro_bitacora,
+        )
+
+    def test_filtro_por_accion(self):
+        respuesta = self.cliente.get(
+            reverse("sigeda_bitacora:consultar"), {"accion": "RESPALDO"},
+        )
+        self.assertEqual(respuesta.data["total"], 1)
+        self.assertEqual(respuesta.data["resultados"][0]["cuenta"], "Sistema")
+
+    def test_accion_invalida_responde_400(self):
+        respuesta = self.cliente.get(
+            reverse("sigeda_bitacora:consultar"), {"accion": "NO_EXISTE"},
+        )
+        self.assertEqual(respuesta.status_code, 400)
+
+    def test_filtro_por_numero_paja(self):
+        respuesta = self.cliente.get(
+            reverse("sigeda_bitacora:consultar"), {"numero_paja": "9720"},
+        )
+        self.assertEqual(respuesta.data["total"], 2)
+        for fila in respuesta.data["resultados"]:
+            self.assertEqual(fila["numero_paja"], "9720")
+
+    def test_filtro_por_numero_paja_inexistente(self):
+        respuesta = self.cliente.get(
+            reverse("sigeda_bitacora:consultar"), {"numero_paja": "0000"},
+        )
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertEqual(respuesta.data, {"total": 0, "resultados": []})
+
+    def test_filtro_por_fechas(self):
+        hoy = datetime.date.today().isoformat()
+        respuesta = self.cliente.get(
+            reverse("sigeda_bitacora:consultar"), {"desde": hoy},
+        )
+        ids = {fila["id_registro_bitacora"] for fila in respuesta.data["resultados"]}
+        self.assertNotIn(self.registro_modificacion.id_registro_bitacora, ids)
+        self.assertIn(self.registro_creacion.id_registro_bitacora, ids)
+
+        hace_15_dias = (
+            datetime.date.today() - datetime.timedelta(days=15)
+        ).isoformat()
+        hace_5_dias = (
+            datetime.date.today() - datetime.timedelta(days=5)
+        ).isoformat()
+        respuesta = self.cliente.get(
+            reverse("sigeda_bitacora:consultar"),
+            {"desde": hace_15_dias, "hasta": hace_5_dias},
+        )
+        ids = {fila["id_registro_bitacora"] for fila in respuesta.data["resultados"]}
+        self.assertEqual(ids, {self.registro_modificacion.id_registro_bitacora})
+
+    def test_fecha_invalida_responde_400(self):
+        respuesta = self.cliente.get(
+            reverse("sigeda_bitacora:consultar"), {"desde": "no-es-fecha"},
+        )
+        self.assertEqual(respuesta.status_code, 400)
+
+    def test_resuelve_numero_paja_y_tipo_documento_sin_n_mas_1(self):
+        respuesta = self.cliente.get(
+            reverse("sigeda_bitacora:consultar"), {"numero_paja": "9720"},
+        )
+
+        fila_creacion = next(
+            fila for fila in respuesta.data["resultados"]
+            if fila["id_registro_bitacora"]
+            == self.registro_creacion.id_registro_bitacora
+        )
+        self.assertEqual(fila_creacion["numero_paja"], "9720")
+        self.assertEqual(fila_creacion["tipo_documento"], "Plano legible")
+
+        fila_modificacion = next(
+            fila for fila in respuesta.data["resultados"]
+            if fila["id_registro_bitacora"]
+            == self.registro_modificacion.id_registro_bitacora
+        )
+        self.assertIsNone(fila_modificacion["tipo_documento"])
+        self.assertEqual(len(fila_modificacion["modificaciones"]), 1)
+        self.assertEqual(
+            fila_modificacion["modificaciones"][0]["campo"],
+            "abonado.tipo_abonado",
+        )
+
+    def test_limit_y_offset(self):
+        respuesta = self.cliente.get(
+            reverse("sigeda_bitacora:consultar"), {"limit": 1, "offset": 0},
+        )
+        self.assertEqual(respuesta.data["total"], 3)
+        self.assertEqual(len(respuesta.data["resultados"]), 1)

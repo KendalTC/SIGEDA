@@ -15,10 +15,16 @@ import type {
   ContrasenaTemporalGenerada,
   CriteriosBusqueda,
   Cuenta,
+  DatosGrupoAlternativas,
   DatosPruebaRestauracion,
   DatosRestaurar,
+  DatosTipoDocumento,
+  DetalleCompletitud,
   Expediente,
+  FiltrosBitacora,
+  FiltrosCompletitud,
   FiltrosExpediente,
+  GrupoAlternativas,
   MetadatoArchivo,
   ModificarAbonadoDatos,
   OtraCuenta,
@@ -27,10 +33,14 @@ import type {
   PersonaReferencia,
   PruebaRestauracion,
   Respaldo,
+  RespuestaBitacora,
   RespuestaBusqueda,
+  RespuestaCompletitud,
   RespuestaRespaldos,
+  ResultadoExportacion,
   ResultadoImportacion,
   SectorCatalogo,
+  TipoDocumentoAdmin,
   TipoDocumentoCatalogo,
   VistaPreviaImportacion,
 } from "./types";
@@ -618,4 +628,135 @@ export async function descargarVersion(
   }
 
   return response.blob();
+}
+
+// --- RF-09 Tipos de documento y grupos de alternativas (PAN-10) -----
+
+/** Lista administrativa completa (con obligatoriedad/grupo), distinta
+ * del catálogo liviano que usa PAN-05 (`listarTiposDocumento`).
+ * Ruta real del backend: vive bajo `/catalogos/` junto al resto de
+ * `apps.configuration.sigeda_urls`, no en la raíz `/api/sigeda/` que
+ * describía el contrato inicial de este incremento. */
+export function listarTiposDocumentoAdmin(token: string) {
+  return sigedaFetch<TipoDocumentoAdmin[]>(
+    "/api/sigeda/catalogos/tipos-documento/administracion/",
+    { token },
+  );
+}
+
+export function crearTipoDocumento(token: string, datos: DatosTipoDocumento) {
+  return sigedaFetch<{ detail: string; id_tipo_documento: number }>(
+    "/api/sigeda/catalogos/tipos-documento/crear/",
+    {
+      method: "POST",
+      token,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(datos),
+    },
+  );
+}
+
+export function editarTipoDocumento(
+  token: string,
+  idTipoDocumento: number,
+  datos: DatosTipoDocumento,
+) {
+  return sigedaFetch<{ detail: string; id_tipo_documento: number }>(
+    `/api/sigeda/catalogos/tipos-documento/${idTipoDocumento}/editar/`,
+    {
+      method: "POST",
+      token,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(datos),
+    },
+  );
+}
+
+export function listarGruposAlternativas(token: string) {
+  return sigedaFetch<GrupoAlternativas[]>(
+    "/api/sigeda/catalogos/grupos-alternativas/",
+    { token },
+  );
+}
+
+export function crearGrupoAlternativas(
+  token: string,
+  datos: DatosGrupoAlternativas,
+) {
+  return sigedaFetch<{ detail: string; id_grupo_alternativas: number }>(
+    "/api/sigeda/catalogos/grupos-alternativas/crear/",
+    {
+      method: "POST",
+      token,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(datos),
+    },
+  );
+}
+
+// --- RF-14 Completitud (PAN-07) --------------------------------------
+// Rutas reales: cuelgan de `apps.abonados.urls` (bajo
+// `/api/sigeda/abonados/`), no de una raíz `/api/sigeda/completitud/`
+// aparte como describía el contrato inicial.
+
+export function obtenerCompletitud(token: string, filtros?: FiltrosCompletitud) {
+  const params = new URLSearchParams();
+
+  if (filtros?.id_sector) params.set("id_sector", String(filtros.id_sector));
+  if (filtros?.tipo_abonado) params.set("tipo_abonado", filtros.tipo_abonado);
+  if (filtros?.documento_faltante) {
+    params.set("documento_faltante", filtros.documento_faltante);
+  }
+  if (filtros?.mostrar_de_baja) params.set("mostrar_de_baja", "true");
+
+  const query = params.toString();
+
+  return sigedaFetch<RespuestaCompletitud>(
+    `/api/sigeda/abonados/completitud/${query ? `?${query}` : ""}`,
+    { token },
+  );
+}
+
+export function obtenerDetalleCompletitud(token: string, numeroPaja: string) {
+  return sigedaFetch<DetalleCompletitud>(
+    `/api/sigeda/abonados/${encodeURIComponent(numeroPaja)}/completitud/`,
+    { token },
+  );
+}
+
+// --- RF-15 Bitácora (PAN-11) ------------------------------------------
+
+export function obtenerBitacora(token: string, filtros?: FiltrosBitacora) {
+  const params = new URLSearchParams();
+
+  if (filtros?.usuario) params.set("usuario", filtros.usuario);
+  if (filtros?.desde) params.set("desde", filtros.desde);
+  if (filtros?.hasta) params.set("hasta", filtros.hasta);
+  if (filtros?.numero_paja) params.set("numero_paja", filtros.numero_paja);
+  if (filtros?.accion) params.set("accion", filtros.accion);
+  params.set("limit", String(filtros?.limit ?? 50));
+  params.set("offset", String(filtros?.offset ?? 0));
+
+  return sigedaFetch<RespuestaBitacora>(
+    `/api/sigeda/bitacora/?${params.toString()}`,
+    { token },
+  );
+}
+
+// --- RF-18 Exportar documentos (PAN-12) -------------------------------
+
+export function exportarDocumentos(
+  token: string,
+  numeroPaja: string,
+  idsDocumento: number[],
+) {
+  return sigedaFetch<ResultadoExportacion>("/api/sigeda/documentos/exportar/", {
+    method: "POST",
+    token,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      numero_paja: numeroPaja,
+      ids_documento: idsDocumento,
+    }),
+  });
 }

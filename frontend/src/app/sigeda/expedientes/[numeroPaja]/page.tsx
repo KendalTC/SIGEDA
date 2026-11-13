@@ -365,7 +365,6 @@ export default function ExpedientePage() {
     filtroTipo || filtroNombre || filtroFechaDesde || filtroFechaHasta,
   );
   const esActivo = abonado.estado === "ACTIVO";
-  const notaIncrementoId = "nota-incremento-2c";
 
   return (
     <main className="mx-auto flex max-w-5xl flex-col gap-6 p-6">
@@ -433,13 +432,13 @@ export default function ExpedientePage() {
         ) : (
           <Button onClick={abrirBaja}>Reactivar</Button>
         )}
-        <Button variant="secondary" disabled aria-describedby={notaIncrementoId}>
-          Exportar
+        <Button
+          variant="secondary"
+          onClick={() => router.push(`/sigeda/expedientes/${abonado.numero_paja}/exportar`)}
+        >
+          Exportar documentos
         </Button>
       </div>
-      <p id={notaIncrementoId} className="text-sm text-[var(--color-text-muted)]">
-        Exportar estará disponible en un próximo incremento.
-      </p>
 
       <div className="grid gap-6 md:grid-cols-2">
         <section

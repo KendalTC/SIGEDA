@@ -52,6 +52,13 @@ from .models import (
     VinculoAbonado,
 )
 from .serializers import AbonadoSerializer, VinculoAbonadoSerializer
+from .servicio_completitud import (
+    calcular_completitud,
+    listar_incompletos,
+    listar_tipo_pendiente,
+    matriz_completitud,
+    resumen_completitud_global,
+)
 
 LIMITE_BUSQUEDA_PERSONAS = 20
 
@@ -1371,5 +1378,112 @@ class ImportarAbonadosView(APIView):
                     for fila in resultado.rechazados
                 ],
                 "fecha": resultado.fecha,
+            },
+        )
+
+
+class PanelCompletitudView(APIView):
+    """
+    PAN-07 Completitud (RF-14): tarjetas globales + lista de
+    incompletos + lista de tipo pendiente, en una sola respuesta.
+    Los abonados de baja no cuentan en los totales (confirmado); con
+    `mostrar_de_baja=true` se informa aparte cuántos son, sin tocar el
+    cálculo global.
+    """
+
+    authentication_classes = [AutenticacionCuenta]
+    permission_classes = [CuentaAutenticadaPermission]
+
+    def get(self, request):
+        id_sector = request.query_params.get("id_sector")
+
+        if id_sector is not None and not id_sector.isdigit():
+            return Response(
+                {
+                    "detail": (
+                        f"El sector «{id_sector}» no es válido. Elija un "
+                        "sector de la lista."
+                    ),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        tipo_abonado = request.query_params.get("tipo_abonado") or None
+
+        if tipo_abonado is not None and tipo_abonado not in TipoAbonado.values:
+            return Response(
+                {
+                    "detail": (
+                        f"El tipo de abonado «{tipo_abonado}» no es válido. "
+                        "Elija una opción de la lista."
+                    ),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        documento_faltante = request.query_params.get("documento_faltante") or None
+        mostrar_de_baja = request.query_params.get("mostrar_de_baja") == "true"
+
+        filtros = {
+            "id_sector": int(id_sector) if id_sector else None,
+            "tipo_abonado": tipo_abonado,
+        }
+
+        respuesta = {
+            "tarjetas": resumen_completitud_global(filtros),
+            "incompletos": listar_incompletos(
+                {**filtros, "documento_faltante": documento_faltante},
+            ),
+            "tipo_pendiente": listar_tipo_pendiente(filtros),
+        }
+
+        if mostrar_de_baja:
+            queryset_baja = Abonado.objects.filter(estado=EstadoAbonado.DE_BAJA)
+
+            if filtros["id_sector"]:
+                queryset_baja = queryset_baja.filter(sector_id=filtros["id_sector"])
+
+            if filtros["tipo_abonado"]:
+                queryset_baja = queryset_baja.filter(
+                    tipo_abonado=filtros["tipo_abonado"],
+                )
+
+            respuesta["de_baja"] = {"cantidad": queryset_baja.count()}
+
+        return Response(respuesta)
+
+
+class DetalleCompletitudAbonadoView(APIView):
+    """PAN-07 (vista detalle): completitud de un abonado + matriz
+    "documento obligatorio × titular × cotitular"."""
+
+    authentication_classes = [AutenticacionCuenta]
+    permission_classes = [CuentaAutenticadaPermission]
+
+    def get(self, request, numero_paja):
+        try:
+            abonado = Abonado.objects.select_related("sector").get(
+                numero_paja=numero_paja,
+            )
+        except Abonado.DoesNotExist:
+            return Response(
+                {
+                    "detail": (
+                        f"No existe un expediente con el número de paja "
+                        f"{numero_paja}."
+                    ),
+                },
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        resultado = calcular_completitud(abonado)
+
+        return Response(
+            {
+                "numero_paja": abonado.numero_paja,
+                "tipo_abonado": abonado.tipo_abonado,
+                "completo": resultado["completo"],
+                "faltantes": resultado["faltantes"],
+                "matriz": matriz_completitud(abonado),
             },
         )

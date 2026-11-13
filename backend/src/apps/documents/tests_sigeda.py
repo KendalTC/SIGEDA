@@ -7,6 +7,8 @@ esta app y la regla "vínculo vigente" que programa la aplicación.
 
 import datetime
 import shutil
+import tempfile
+from pathlib import Path
 
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
@@ -626,4 +628,174 @@ class VersionesDocumentoCargadaPorTests(TestCase):
         )
         self.assertEqual(
             versiones_por_numero[2]["cargada_por"], "administracion_v13",
+        )
+
+
+def _raiz_prueba_exportar():
+    return str(settings.BASE_DIR / "almacen_cifrado_test_exportar")
+
+
+@override_settings(DOCUMENT_STORAGE_ROOT=_raiz_prueba_exportar())
+class ExportarDocumentosViewTests(TestCase):
+    """
+    PAN-12 Exportar (RF-18, RN-10): copia descifrada de las versiones
+    vigentes a una carpeta del entorno. Los documentos se cargan con
+    el flujo real de `ControladorDocumentos` (cifrado real), no se
+    fabrican a mano.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        shutil.rmtree(_raiz_prueba_exportar(), ignore_errors=True)
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(_raiz_prueba_exportar(), ignore_errors=True)
+        super().tearDownClass()
+
+    def setUp(self):
+        self.directorio_exportacion = tempfile.mkdtemp()
+
+        self.abonado = Abonado.objects.create(
+            numero_paja="0940", tipo_abonado=TipoAbonado.PERSONA_FISICA,
+        )
+        self.titular = Persona.objects.create(nombre="Ana Lucía Mora Vega")
+        VinculoAbonado.objects.create(
+            abonado=self.abonado,
+            persona=self.titular,
+            fecha_inicio=datetime.date(2020, 1, 1),
+            rol="TITULAR",
+        )
+        self.cuenta = Cuenta.objects.create(
+            usuario="secretaria_exportar",
+            hash_contrasena=make_password("Prueba2026!"),
+            perfil="SECRETARIA",
+        )
+        self.cliente = APIClient()
+        token = TokenCuenta.objects.create(cuenta=self.cuenta)
+        self.cliente.credentials(HTTP_AUTHORIZATION=f"Bearer {token.key}")
+
+        self.tipo_documento = TipoDocumento.objects.get(nombre="Plano legible")
+        self.controlador = ControladorDocumentos()
+        self.contenido_original = PDF_MINIMO + b" plano original"
+
+        with self.captureOnCommitCallbacks(execute=True):
+            self.resultado = self.controlador.cargar_documento(
+                abonado=self.abonado,
+                tipo_documento=self.tipo_documento,
+                persona=self.titular,
+                nombre_identificador="plano",
+                fecha_documento=datetime.date(2026, 1, 1),
+                nombre_original="plano_original.pdf",
+                contenido=self.contenido_original,
+                cuenta=self.cuenta,
+            )
+
+    def tearDown(self):
+        shutil.rmtree(self.directorio_exportacion, ignore_errors=True)
+
+    def test_exporta_archivo_descifrado_identico_al_original(self):
+        with override_settings(SIGEDA_EXPORT_DIR=self.directorio_exportacion):
+            respuesta = self.cliente.post(
+                reverse("sigeda_documents:exportar"),
+                {
+                    "numero_paja": "0940",
+                    "ids_documento": [self.resultado.documento.id_documento],
+                },
+                format="json",
+            )
+
+        self.assertEqual(respuesta.status_code, 200, respuesta.data)
+        self.assertEqual(respuesta.data["cantidad"], 1)
+
+        ruta_exportada = Path(respuesta.data["ruta"]) / "plano_original.pdf"
+        self.assertTrue(ruta_exportada.exists())
+        # Exactamente el contenido original, NO el cifrado (RNF-10).
+        self.assertEqual(ruta_exportada.read_bytes(), self.contenido_original)
+
+        registro = RegistroBitacora.objects.get(
+            accion=AccionBitacora.EXPORTACION,
+            elemento_afectado="exportacion.numero_paja=0940",
+        )
+        self.assertEqual(registro.cuenta, self.cuenta)
+        self.assertEqual(
+            RegistroBitacora.objects.filter(
+                accion=AccionBitacora.EXPORTACION,
+            ).count(),
+            1,
+        )
+
+        modificacion = RegistroModificacion.objects.get(
+            registro_bitacora=registro, campo_modificado="exportacion.resumen",
+        )
+        self.assertIn("1 documento", modificacion.valor_nuevo)
+
+    def test_sin_carpeta_configurada_responde_400_y_no_crea_nada(self):
+        with override_settings(SIGEDA_EXPORT_DIR=None):
+            respuesta = self.cliente.post(
+                reverse("sigeda_documents:exportar"),
+                {
+                    "numero_paja": "0940",
+                    "ids_documento": [self.resultado.documento.id_documento],
+                },
+                format="json",
+            )
+
+        self.assertEqual(respuesta.status_code, 400)
+        self.assertIn("carpeta de exportación", respuesta.data["detail"])
+        self.assertFalse(
+            RegistroBitacora.objects.filter(
+                accion=AccionBitacora.EXPORTACION,
+            ).exists(),
+        )
+        self.assertEqual(list(Path(self.directorio_exportacion).iterdir()), [])
+
+    def test_numero_paja_inexistente_responde_404(self):
+        with override_settings(SIGEDA_EXPORT_DIR=self.directorio_exportacion):
+            respuesta = self.cliente.post(
+                reverse("sigeda_documents:exportar"),
+                {"numero_paja": "0000", "ids_documento": [1]},
+                format="json",
+            )
+
+        self.assertEqual(respuesta.status_code, 404)
+
+    def test_documento_que_no_pertenece_al_abonado_se_rechaza(self):
+        otro_abonado = Abonado.objects.create(
+            numero_paja="0941", tipo_abonado=TipoAbonado.PERSONA_FISICA,
+        )
+        otro_titular = Persona.objects.create(nombre="Esteban Mora Vega")
+        VinculoAbonado.objects.create(
+            abonado=otro_abonado,
+            persona=otro_titular,
+            fecha_inicio=datetime.date(2020, 1, 1),
+            rol="TITULAR",
+        )
+        otro_resultado = self.controlador.cargar_documento(
+            abonado=otro_abonado,
+            tipo_documento=self.tipo_documento,
+            persona=otro_titular,
+            nombre_identificador=None,
+            fecha_documento=datetime.date(2026, 1, 1),
+            nombre_original="otro.pdf",
+            contenido=PDF_MINIMO + b" otro",
+            cuenta=self.cuenta,
+        )
+
+        with override_settings(SIGEDA_EXPORT_DIR=self.directorio_exportacion):
+            respuesta = self.cliente.post(
+                reverse("sigeda_documents:exportar"),
+                {
+                    "numero_paja": "0940",
+                    "ids_documento": [otro_resultado.documento.id_documento],
+                },
+                format="json",
+            )
+
+        self.assertEqual(respuesta.status_code, 400)
+        self.assertFalse(
+            RegistroBitacora.objects.filter(
+                accion=AccionBitacora.EXPORTACION,
+            ).exists(),
         )

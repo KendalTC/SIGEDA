@@ -12,4 +12,5 @@ urlpatterns = [
     path("api/sigeda/documentos/", include("apps.documents.sigeda_urls")),
     path("api/sigeda/catalogos/", include("apps.configuration.sigeda_urls")),
     path("api/sigeda/respaldos/", include("apps.respaldos.sigeda_urls")),
+    path("api/sigeda/bitacora/", include("apps.bitacora.sigeda_urls")),
 ]

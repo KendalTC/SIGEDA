@@ -68,6 +68,24 @@ export function BarraSesion() {
         >
           Importar SADA
         </Link>
+        <Link
+          href="/sigeda/tipos-documento"
+          className="text-[var(--color-primary)] underline"
+        >
+          Tipos de documento
+        </Link>
+        <Link
+          href="/sigeda/completitud"
+          className="text-[var(--color-primary)] underline"
+        >
+          Completitud
+        </Link>
+        <Link
+          href="/sigeda/bitacora"
+          className="text-[var(--color-primary)] underline"
+        >
+          Bitácora
+        </Link>
       </div>
 
       <div className="flex flex-wrap items-center gap-4">

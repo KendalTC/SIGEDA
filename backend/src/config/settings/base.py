@@ -203,3 +203,12 @@ SIGEDA_BACKUP_DISCO_EXTERNO_DIR = env(
 SIGEDA_BACKUP_ONEDRIVE_DIR = env(
     "SIGEDA_BACKUP_ONEDRIVE_DIR", default=None,
 )
+
+# -----------------------------------------------------------------------------
+# SIGEDA: exportar documentos (RF-18, RN-10)
+# -----------------------------------------------------------------------------
+
+# SUPUESTO de entorno (igual que arriba): en este entorno de desarrollo
+# es una ruta de carpeta configurable por variable de entorno, no la
+# carpeta real que elija la usuaria en la laptop.
+SIGEDA_EXPORT_DIR = env("SIGEDA_EXPORT_DIR", default=None)

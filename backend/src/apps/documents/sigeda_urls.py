@@ -5,6 +5,7 @@ from .sigeda_views import (
     CargarDocumentosView,
     DescargarVersionDocumentoView,
     EditarDatosDocumentoView,
+    ExportarDocumentosView,
     VersionesDocumentoView,
 )
 
@@ -12,6 +13,7 @@ app_name = "sigeda_documents"
 
 urlpatterns = [
     path("cargar/", CargarDocumentosView.as_view(), name="cargar"),
+    path("exportar/", ExportarDocumentosView.as_view(), name="exportar"),
     path(
         "<int:id_documento>/anular/",
         AnularDocumentoView.as_view(),
