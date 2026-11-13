@@ -6,6 +6,9 @@ import {
 } from "@/lib/api/errors";
 
 import type {
+  AgregarPersonaDatos,
+  AltaAbonadoDatos,
+  CambiarTitularDatos,
   CargaDocumentosError,
   CargaDocumentosExito,
   ContrasenaTemporalGenerada,
@@ -14,7 +17,11 @@ import type {
   Expediente,
   FiltrosExpediente,
   MetadatoArchivo,
+  ModificarAbonadoDatos,
   OtraCuenta,
+  PersonaBusqueda,
+  PersonaExistenteConflicto,
+  PersonaReferencia,
   RespuestaBusqueda,
   SectorCatalogo,
   TipoDocumentoCatalogo,
@@ -322,6 +329,161 @@ export function esErrorDeCarga(
     !!payload &&
     typeof payload === "object" &&
     Array.isArray((payload as CargaDocumentosError).errores)
+  );
+}
+
+/** `titular`/`persona` en el contrato aceptan una persona ya registrada
+ * (`id_persona`) o los datos para crear una nueva; acá se arma el
+ * fragmento del cuerpo según cuál llegó. */
+function personaReferenciaABody(
+  persona: PersonaReferencia,
+): Record<string, unknown> {
+  if ("id_persona" in persona) {
+    return { id_persona: persona.id_persona };
+  }
+
+  return {
+    nombre: persona.nombre,
+    tipo_identificacion: persona.tipo_identificacion,
+    identificacion: persona.identificacion,
+  };
+}
+
+/** RF-02/D-06/D-04: personas ya registradas (nombre o identificación),
+ * con sus vínculos vigentes, para no duplicarlas. */
+export function buscarPersonas(token: string, q: string) {
+  const params = new URLSearchParams({ q });
+
+  return sigedaFetch<PersonaBusqueda[]>(
+    `/api/sigeda/abonados/personas/buscar/?${params.toString()}`,
+    { token },
+  );
+}
+
+/** Body 409 cuando la identificación ya pertenece a una persona
+ * registrada (ficha PAN-06, estado "persona-existente"). */
+export function esPersonaExistente(
+  payload: unknown,
+): payload is { persona_existente: PersonaExistenteConflicto } {
+  return (
+    !!payload &&
+    typeof payload === "object" &&
+    "persona_existente" in payload &&
+    !!(payload as { persona_existente?: unknown }).persona_existente
+  );
+}
+
+/** RF-02: alta de abonado (PAN-06 "Registrar abonado"). Abonado +
+ * persona (nueva o reutilizada) + vínculo TITULAR, en una transacción. */
+export function registrarAbonado(token: string, datos: AltaAbonadoDatos) {
+  return sigedaFetch<{ detail: string; numero_paja: string }>(
+    "/api/sigeda/abonados/alta/",
+    {
+      method: "POST",
+      token,
+      headers: { "Content-Type": "application/json" },
+      // El backend recibe los datos del titular al mismo nivel que
+      // numero_paja/id_sector/tipo_abonado (sin anidar "titular").
+      body: JSON.stringify({
+        numero_paja: datos.numero_paja,
+        id_sector: datos.id_sector,
+        tipo_abonado: datos.tipo_abonado,
+        ...personaReferenciaABody(datos.titular),
+      }),
+    },
+  );
+}
+
+/** RF-21: sector y tipo (PAN-06 "Modificar abonado y personas"). La
+ * paja y el estado no se tocan acá. */
+export function modificarAbonado(
+  token: string,
+  numeroPaja: string,
+  datos: ModificarAbonadoDatos,
+) {
+  return sigedaFetch<{ detail: string }>(
+    `/api/sigeda/abonados/${encodeURIComponent(numeroPaja)}/modificar/`,
+    {
+      method: "POST",
+      token,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(datos),
+    },
+  );
+}
+
+/** D-06: agrega un cotitular o una persona apoderada (nunca titular). */
+export function agregarPersonaAsociada(
+  token: string,
+  numeroPaja: string,
+  datos: AgregarPersonaDatos,
+) {
+  return sigedaFetch<{ detail: string }>(
+    `/api/sigeda/abonados/${encodeURIComponent(numeroPaja)}/personas/`,
+    {
+      method: "POST",
+      token,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...personaReferenciaABody(datos.persona),
+        rol: datos.rol,
+        fecha_inicio: datos.fecha_inicio,
+      }),
+    },
+  );
+}
+
+/** PAN-06 modificar, tabla de personas: cierra el vínculo (no borra
+ * documentos ya aportados por esa persona). */
+export function quitarPersonaAsociada(
+  token: string,
+  numeroPaja: string,
+  idPersona: number,
+) {
+  return sigedaFetch<{ detail: string }>(
+    `/api/sigeda/abonados/${encodeURIComponent(numeroPaja)}/personas/${idPersona}/quitar/`,
+    { method: "POST", token },
+  );
+}
+
+/** PAN-06 modificar, tabla de personas: cambia el rol en el mismo
+ * vínculo abierto (no abre uno nuevo; la fecha de inicio no cambia). */
+export function cambiarRolPersonaAsociada(
+  token: string,
+  numeroPaja: string,
+  idPersona: number,
+  rol: "COTITULAR" | "APODERADA",
+) {
+  return sigedaFetch<{ detail: string }>(
+    `/api/sigeda/abonados/${encodeURIComponent(numeroPaja)}/personas/${idPersona}/cambiar-rol/`,
+    {
+      method: "POST",
+      token,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ rol }),
+    },
+  );
+}
+
+/** D-04/RF-13: cierra el vínculo del titular actual y abre uno nuevo,
+ * en una transacción (hallazgo H-02: se abre directo desde el
+ * expediente, sin pasar por "Modificar abonado"). */
+export function cambiarTitular(
+  token: string,
+  numeroPaja: string,
+  datos: CambiarTitularDatos,
+) {
+  return sigedaFetch<{ detail: string }>(
+    `/api/sigeda/abonados/${encodeURIComponent(numeroPaja)}/cambiar-titular/`,
+    {
+      method: "POST",
+      token,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...personaReferenciaABody(datos.persona),
+        fecha_cambio: datos.fecha_cambio,
+      }),
+    },
   );
 }
 

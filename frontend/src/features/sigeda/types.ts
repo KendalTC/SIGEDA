@@ -174,3 +174,65 @@ export type CargaDocumentosError = {
   detail: string;
   errores: ErrorArchivo[];
 };
+
+/** RF-02/RF-21/D-04/D-06: resultado del buscador compartido de personas
+ * (`GET /api/sigeda/abonados/personas/buscar/?q=`). */
+export type PersonaBusqueda = {
+  id_persona: number;
+  nombre: string;
+  tipo_identificacion: string | null;
+  identificacion: string | null;
+  vinculos_actuales: string[];
+};
+
+export type TipoIdentificacion =
+  | "CEDULA_FISICA"
+  | "CEDULA_JURIDICA"
+  | "DIMEX"
+  | "PASAPORTE";
+
+/** Datos de una persona que todavía no está registrada; el backend la
+ * crea (o, si la identificación ya existe, responde 409 con
+ * `PersonaExistenteConflicto` para ofrecer "Usar esa persona"). */
+export type DatosPersonaNueva = {
+  nombre: string;
+  tipo_identificacion: TipoIdentificacion;
+  identificacion: string;
+};
+
+/** Cualquier endpoint que reciba "una persona" acepta una ya existente
+ * por id o los datos para crear una nueva. */
+export type PersonaReferencia = { id_persona: number } | DatosPersonaNueva;
+
+/** Cuerpo 409 cuando la identificación escrita ya pertenece a una
+ * persona registrada (RF-02/RF-21, ficha PAN-06 estado "persona-existente"). */
+export type PersonaExistenteConflicto = {
+  id_persona: number;
+  nombre: string;
+  numero_paja_titular: string | null;
+};
+
+export type AltaAbonadoDatos = {
+  numero_paja: string;
+  id_sector: number;
+  tipo_abonado: "PERSONA_FISICA" | "PERSONA_JURIDICA";
+  titular: PersonaReferencia;
+};
+
+export type ModificarAbonadoDatos = {
+  id_sector: number;
+  tipo_abonado: "PERSONA_FISICA" | "PERSONA_JURIDICA";
+};
+
+export type RolAsociado = "COTITULAR" | "APODERADA";
+
+export type AgregarPersonaDatos = {
+  persona: PersonaReferencia;
+  rol: RolAsociado;
+  fecha_inicio: string;
+};
+
+export type CambiarTitularDatos = {
+  persona: PersonaReferencia;
+  fecha_cambio: string;
+};

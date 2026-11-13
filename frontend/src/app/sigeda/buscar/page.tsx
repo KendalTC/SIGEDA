@@ -46,6 +46,7 @@ export default function BuscarExpedientePage() {
   const [estado, setEstado] = useState<Estado>("inicial");
   const [errorPaja, setErrorPaja] = useState<string | null>(null);
   const [mensaje, setMensaje] = useState<string | null>(null);
+  const [pajaSinResultados, setPajaSinResultados] = useState<string | null>(null);
   const [avisoLimite, setAvisoLimite] = useState<string | null>(null);
   const [resultados, setResultados] = useState<ResultadoBusqueda[]>([]);
 
@@ -123,6 +124,7 @@ export default function BuscarExpedientePage() {
       if (respuesta.total === 0) {
         setEstado("sin_resultados");
         setResultados([]);
+        setPajaSinResultados(numeroPaja || null);
         setMensaje(
           numeroPaja
             ? `No hay expedientes con el número de paja ${numeroPaja}. Revise ` +
@@ -134,6 +136,7 @@ export default function BuscarExpedientePage() {
         return;
       }
 
+      setPajaSinResultados(null);
       setEstado("exito");
       setResultados(respuesta.resultados);
       setMensaje(
@@ -179,6 +182,7 @@ export default function BuscarExpedientePage() {
     setIncluirBaja(true);
     setEstado("inicial");
     setMensaje(null);
+    setPajaSinResultados(null);
     setAvisoLimite(null);
     setErrorPaja(null);
     setResultados([]);
@@ -282,7 +286,19 @@ export default function BuscarExpedientePage() {
           role="status"
           className="rounded-[var(--radius-md)] border border-[var(--color-warning)] bg-[var(--color-warning-soft)] px-4 py-3 text-[var(--color-warning)]"
         >
-          {mensaje}
+          {pajaSinResultados ? (
+            <p>
+              No hay expedientes con el número de paja {pajaSinResultados}.
+              Revise el número o busque por el nombre del titular. Si el
+              abonado es nuevo, puede{" "}
+              <Link href="/sigeda/abonados/nuevo" className="underline">
+                registrarlo
+              </Link>
+              .
+            </p>
+          ) : (
+            mensaje
+          )}
         </div>
       ) : null}
 

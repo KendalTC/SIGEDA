@@ -25,6 +25,10 @@ import {
   reactivarAbonado,
 } from "@/features/sigeda/api";
 import { useSigedaAuth } from "@/features/sigeda/auth-context";
+import {
+  DialogoCambiarTitular,
+  type DialogoCambiarTitularHandle,
+} from "@/features/sigeda/dialogo-cambiar-titular";
 import { hoyComoFechaIso } from "@/features/sigeda/validacion-archivo";
 import type {
   Completitud,
@@ -281,6 +285,9 @@ export default function ExpedientePage() {
     }
   }
 
+  // --- D-04 Cambiar titular (RF-13, hallazgo H-02: se abre directo) ---
+  const dialogoCambiarTitularRef = useRef<DialogoCambiarTitularHandle>(null);
+
   // --- D-03 Dar de baja / reactivar el abonado -----------------------
   const dialogBajaRef = useRef<HTMLDialogElement>(null);
   const [fechaBaja, setFechaBaja] = useState("");
@@ -413,7 +420,10 @@ export default function ExpedientePage() {
         >
           Cargar documento
         </Button>
-        <Button variant="secondary" disabled aria-describedby={notaIncrementoId}>
+        <Button
+          variant="secondary"
+          onClick={() => router.push(`/sigeda/abonados/${abonado.numero_paja}/modificar`)}
+        >
           Modificar abonado
         </Button>
         {esActivo ? (
@@ -428,8 +438,7 @@ export default function ExpedientePage() {
         </Button>
       </div>
       <p id={notaIncrementoId} className="text-sm text-[var(--color-text-muted)]">
-        Cambiar titular, modificar abonado, agregar o quitar personas y exportar
-        estarán disponibles en un próximo incremento.
+        Exportar estará disponible en un próximo incremento.
       </p>
 
       <div className="grid gap-6 md:grid-cols-2">
@@ -520,10 +529,16 @@ export default function ExpedientePage() {
           ) : null}
 
           <div className="mt-3 flex flex-wrap gap-2">
-            <Button variant="secondary" disabled aria-describedby={notaIncrementoId}>
+            <Button
+              variant="secondary"
+              onClick={() => router.push(`/sigeda/abonados/${abonado.numero_paja}/modificar`)}
+            >
               Agregar o quitar personas
             </Button>
-            <Button variant="secondary" disabled aria-describedby={notaIncrementoId}>
+            <Button
+              variant="secondary"
+              onClick={() => dialogoCambiarTitularRef.current?.abrir()}
+            >
               Cambiar titular…
             </Button>
           </div>
@@ -963,6 +978,18 @@ export default function ExpedientePage() {
           </div>
         </form>
       </dialog>
+
+      {/* D-04 Cambiar titular (RF-13, hallazgo H-02) */}
+      <DialogoCambiarTitular
+        ref={dialogoCambiarTitularRef}
+        token={sesion!.token}
+        numeroPaja={abonado.numero_paja}
+        titularActualNombre={abonado.titular_vigente?.nombre ?? "Sin titular"}
+        onCambiado={() => {
+          setMensajeAccion("Titular cambiado.");
+          cargar();
+        }}
+      />
     </main>
   );
 }
