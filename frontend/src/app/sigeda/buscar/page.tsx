@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -66,10 +66,10 @@ export default function BuscarExpedientePage() {
     numeroPaja || nombre || identificacion || idSector,
   );
 
-  async function manejarEnvio(evento: FormEvent) {
-    evento.preventDefault();
-
+  async function ejecutarBusqueda(idSectorOverride?: string) {
     if (!sesion) return;
+
+    const idSectorActual = idSectorOverride ?? idSector;
 
     if (numeroPaja && !PATRON_PAJA.test(numeroPaja)) {
       setErrorPaja(
@@ -81,7 +81,15 @@ export default function BuscarExpedientePage() {
 
     setErrorPaja(null);
 
-    if (!hayCriterios) {
+    const hayCriteriosActuales = Boolean(
+      numeroPaja || nombre || identificacion || idSectorActual,
+    );
+
+    if (!hayCriteriosActuales) {
+      setEstado("inicial");
+      setMensaje(null);
+      setAvisoLimite(null);
+      setResultados([]);
       return;
     }
 
@@ -90,14 +98,15 @@ export default function BuscarExpedientePage() {
     setAvisoLimite(null);
 
     const sectorNombre =
-      sectores.find((s) => String(s.id_sector) === idSector)?.nombre ?? null;
+      sectores.find((s) => String(s.id_sector) === idSectorActual)?.nombre ??
+      null;
 
     try {
       const respuesta = await buscarExpedientes(sesion.token, {
         numero_paja: numeroPaja || undefined,
         nombre: nombre || undefined,
         identificacion: identificacion || undefined,
-        id_sector: idSector ? Number(idSector) : undefined,
+        id_sector: idSectorActual ? Number(idSectorActual) : undefined,
         incluir_baja: incluirBaja,
       });
 
@@ -149,6 +158,17 @@ export default function BuscarExpedientePage() {
           : "No fue posible completar la búsqueda.",
       );
     }
+  }
+
+  async function manejarEnvio(evento: FormEvent) {
+    evento.preventDefault();
+    await ejecutarBusqueda();
+  }
+
+  function manejarCambioSector(evento: ChangeEvent<HTMLSelectElement>) {
+    const nuevoSector = evento.target.value;
+    setIdSector(nuevoSector);
+    ejecutarBusqueda(nuevoSector);
   }
 
   function limpiar() {
@@ -212,11 +232,7 @@ export default function BuscarExpedientePage() {
 
           <div className="flex flex-col gap-1.5">
             <label htmlFor="sector">Sector</label>
-            <Select
-              id="sector"
-              value={idSector}
-              onChange={(e) => setIdSector(e.target.value)}
-            >
+            <Select id="sector" value={idSector} onChange={manejarCambioSector}>
               <option value="">Todos</option>
               {sectores.map((sector) => (
                 <option key={sector.id_sector} value={sector.id_sector}>
