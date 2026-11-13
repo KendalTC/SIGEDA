@@ -14,9 +14,13 @@ from django.urls import reverse
 from rest_framework.test import APIClient
 
 from apps.accounts.models import Cuenta, TokenCuenta
+from apps.bitacora.models import AccionBitacora, RegistroBitacora
+from apps.configuration.models import TipoDocumento
+from apps.documents.models import Documento, VersionDocumento
 
 from . import controlador_busqueda as cb
 from .models import Abonado, Persona, Sector, TipoAbonado, VinculoAbonado
+from .servicio_completitud import calcular_completitud
 
 
 class AbonadoConstraintsTests(TestCase):
@@ -429,3 +433,439 @@ class SectoresViewTests(TestCase):
         nombres = {fila["nombre"] for fila in respuesta.data}
         self.assertIn("Bodegas", nombres)
         self.assertIn("Pilas", nombres)
+
+
+class CompletitudAbonadoTests(TestCase):
+    """
+    Q3 (RF-14): servicio reutilizable de completitud. Hoy lo usa el
+    indicador breve de PAN-04 ("Incompleto · faltan N"); el detalle a
+    fondo (PAN-07) es del Incremento 4.
+    """
+
+    TIPOS_PERSONA_FISICA = [
+        "Plano legible",
+        "Formulario de solicitud",
+        "Copia de cédula",
+        "Certificación de registro de propiedad",
+        "Contrato de servicio",
+    ]
+
+    def setUp(self):
+        self.abonado = Abonado.objects.create(
+            numero_paja="0601", tipo_abonado=TipoAbonado.PERSONA_FISICA,
+        )
+        self.titular = Persona.objects.create(nombre="Ana Lucía Mora Vega")
+        VinculoAbonado.objects.create(
+            abonado=self.abonado,
+            persona=self.titular,
+            fecha_inicio=datetime.date(2020, 1, 1),
+            rol="TITULAR",
+        )
+
+    def _aportar(self, nombre_tipo, persona, **extra):
+        datos = {
+            "abonado": self.abonado,
+            "tipo_documento": TipoDocumento.objects.get(nombre=nombre_tipo),
+            "persona": persona,
+            "estado": "VIGENTE",
+        }
+        datos.update(extra)
+        return Documento.objects.create(**datos)
+
+    def test_sin_documentos_faltan_los_5_tipos_de_persona_fisica(self):
+        resultado = calcular_completitud(self.abonado)
+        self.assertFalse(resultado["completo"])
+        self.assertEqual(len(resultado["faltantes"]), 5)
+        self.assertIn("Plano legible (titular)", resultado["faltantes"])
+
+    def test_con_todos_los_documentos_vigentes_queda_completo(self):
+        for nombre in self.TIPOS_PERSONA_FISICA:
+            self._aportar(nombre, self.titular)
+
+        resultado = calcular_completitud(self.abonado)
+        self.assertTrue(resultado["completo"])
+        self.assertEqual(resultado["faltantes"], [])
+
+    def test_documento_anulado_no_cuenta(self):
+        for nombre in self.TIPOS_PERSONA_FISICA:
+            self._aportar(nombre, self.titular)
+
+        plano = Documento.objects.get(
+            abonado=self.abonado, tipo_documento__nombre="Plano legible",
+        )
+        plano.estado = "ANULADO"
+        plano.motivo_anulacion = "Documento equivocado"
+        plano.fecha_anulacion = datetime.datetime.now(datetime.timezone.utc)
+        plano.save()
+
+        resultado = calcular_completitud(self.abonado)
+        self.assertFalse(resultado["completo"])
+        self.assertIn("Plano legible (titular)", resultado["faltantes"])
+
+    def test_copia_de_cedula_se_exige_tambien_a_cada_cotitular(self):
+        cotitular = Persona.objects.create(nombre="Esteban Mora Vega")
+        VinculoAbonado.objects.create(
+            abonado=self.abonado,
+            persona=cotitular,
+            fecha_inicio=datetime.date(2020, 1, 1),
+            rol="COTITULAR",
+        )
+
+        for nombre in self.TIPOS_PERSONA_FISICA:
+            self._aportar(nombre, self.titular)
+
+        resultado = calcular_completitud(self.abonado)
+        self.assertFalse(resultado["completo"])
+        self.assertIn(
+            "Copia de cédula del cotitular Esteban Mora Vega",
+            resultado["faltantes"],
+        )
+
+        self._aportar("Copia de cédula", cotitular)
+        resultado = calcular_completitud(self.abonado)
+        self.assertTrue(resultado["completo"])
+
+    def test_grupo_de_alternativas_basta_con_uno(self):
+        abonado_juridico = Abonado.objects.create(
+            numero_paja="0602", tipo_abonado=TipoAbonado.PERSONA_JURIDICA,
+        )
+        titular_juridico = Persona.objects.create(nombre="Acueducto Ficticio S.A.")
+        VinculoAbonado.objects.create(
+            abonado=abonado_juridico,
+            persona=titular_juridico,
+            fecha_inicio=datetime.date(2020, 1, 1),
+            rol="TITULAR",
+        )
+
+        for nombre in [
+            "Plano legible",
+            "Formulario de solicitud",
+            "Contrato de servicio",
+            "Cédula jurídica",
+            "Personería jurídica vigente",
+            "Cédula de la persona apoderada",
+        ]:
+            Documento.objects.create(
+                abonado=abonado_juridico,
+                tipo_documento=TipoDocumento.objects.get(nombre=nombre),
+                persona=titular_juridico,
+                estado="VIGENTE",
+            )
+
+        resultado = calcular_completitud(abonado_juridico)
+        self.assertFalse(resultado["completo"])
+        self.assertIn("Permiso o formulario (titular)", resultado["faltantes"])
+
+        Documento.objects.create(
+            abonado=abonado_juridico,
+            tipo_documento=TipoDocumento.objects.get(
+                nombre="Permiso de construcción vigente",
+            ),
+            persona=titular_juridico,
+            estado="VIGENTE",
+        )
+
+        resultado = calcular_completitud(abonado_juridico)
+        self.assertTrue(resultado["completo"])
+
+    def test_documento_del_titular_anterior_no_cuenta(self):
+        """RF-14: nunca cuentan los documentos de titulares anteriores."""
+
+        titular_anterior = Persona.objects.create(nombre="Rodrigo Mora Castro")
+        VinculoAbonado.objects.create(
+            abonado=self.abonado,
+            persona=titular_anterior,
+            fecha_inicio=datetime.date(2010, 1, 1),
+            fecha_fin=datetime.date(2020, 1, 1),
+            rol="TITULAR",
+        )
+        Documento.objects.create(
+            abonado=self.abonado,
+            tipo_documento=TipoDocumento.objects.get(nombre="Plano legible"),
+            persona=titular_anterior,
+            estado="VIGENTE",
+        )
+
+        resultado = calcular_completitud(self.abonado)
+        self.assertIn("Plano legible (titular)", resultado["faltantes"])
+
+    def test_documento_de_la_persona_apoderada_no_cuenta_para_el_titular(self):
+        """RF-14: nunca cuentan los documentos de la persona apoderada."""
+
+        apoderada = Persona.objects.create(nombre="Mariana Apoderada Solano")
+        VinculoAbonado.objects.create(
+            abonado=self.abonado,
+            persona=apoderada,
+            fecha_inicio=datetime.date(2020, 1, 1),
+            rol="APODERADA",
+        )
+        Documento.objects.create(
+            abonado=self.abonado,
+            tipo_documento=TipoDocumento.objects.get(nombre="Plano legible"),
+            persona=apoderada,
+            estado="VIGENTE",
+        )
+
+        resultado = calcular_completitud(self.abonado)
+        self.assertIn("Plano legible (titular)", resultado["faltantes"])
+
+
+class ExpedienteExtendidoViewTests(TestCase):
+    """
+    1b: filtros RF-11, completitud (Q3) en `abonado`, marca de
+    `aportante_titular_anterior`, `motivo_anulacion`/`fecha_anulacion`
+    y `historial_titulares`.
+    """
+
+    def setUp(self):
+        self.cliente = APIClient()
+        cuenta = Cuenta.objects.create(
+            usuario="secretaria_expediente",
+            hash_contrasena=make_password("Prueba2026!"),
+            perfil="SECRETARIA",
+        )
+        token = TokenCuenta.objects.create(cuenta=cuenta)
+        self.cliente.credentials(HTTP_AUTHORIZATION=f"Bearer {token.key}")
+
+        self.abonado = Abonado.objects.create(
+            numero_paja="0710", tipo_abonado=TipoAbonado.PERSONA_FISICA,
+        )
+        self.titular_anterior = Persona.objects.create(nombre="Rodrigo Mora Castro")
+        VinculoAbonado.objects.create(
+            abonado=self.abonado,
+            persona=self.titular_anterior,
+            fecha_inicio=datetime.date(2010, 1, 1),
+            fecha_fin=datetime.date(2020, 1, 1),
+            rol="TITULAR",
+        )
+        self.titular = Persona.objects.create(nombre="Ana Lucía Mora Vega")
+        VinculoAbonado.objects.create(
+            abonado=self.abonado,
+            persona=self.titular,
+            fecha_inicio=datetime.date(2020, 1, 1),
+            rol="TITULAR",
+        )
+
+        self.tipo_plano = TipoDocumento.objects.get(nombre="Plano legible")
+        self.tipo_formulario = TipoDocumento.objects.get(nombre="Formulario de solicitud")
+
+        self.documento_titular_anterior = Documento.objects.create(
+            abonado=self.abonado,
+            tipo_documento=self.tipo_plano,
+            persona=self.titular_anterior,
+            nombre_identificador="plano viejo",
+        )
+        VersionDocumento.objects.create(
+            documento=self.documento_titular_anterior,
+            numero_version=1,
+            nombre_original="plano.pdf",
+            ruta_archivo="plano-viejo.bin",
+            formato="PDF",
+            tamano_bytes=100,
+            fecha_documento=datetime.date(2015, 6, 1),
+            hash_sha256="0" * 64,
+        )
+
+        self.documento_vigente = Documento.objects.create(
+            abonado=self.abonado,
+            tipo_documento=self.tipo_formulario,
+            persona=self.titular,
+            nombre_identificador="formulario nuevo",
+        )
+        VersionDocumento.objects.create(
+            documento=self.documento_vigente,
+            numero_version=1,
+            nombre_original="formulario.pdf",
+            ruta_archivo="formulario-nuevo.bin",
+            formato="PDF",
+            tamano_bytes=100,
+            fecha_documento=datetime.date(2026, 2, 1),
+            hash_sha256="1" * 64,
+        )
+
+        self.documento_anulado = Documento.objects.create(
+            abonado=self.abonado,
+            tipo_documento=self.tipo_plano,
+            persona=self.titular,
+            estado="ANULADO",
+            motivo_anulacion="Duplicado",
+            fecha_anulacion=datetime.datetime(
+                2026, 3, 1, tzinfo=datetime.timezone.utc,
+            ),
+        )
+        VersionDocumento.objects.create(
+            documento=self.documento_anulado,
+            numero_version=1,
+            nombre_original="plano_dup.pdf",
+            ruta_archivo="plano-dup.bin",
+            formato="PDF",
+            tamano_bytes=100,
+            fecha_documento=datetime.date(2026, 3, 1),
+            hash_sha256="2" * 64,
+        )
+
+    def _get(self, **parametros):
+        return self.cliente.get(
+            reverse("abonados:expediente", args=["0710"]), parametros,
+        )
+
+    def test_incluye_completitud_del_abonado(self):
+        respuesta = self._get()
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertIn("completitud", respuesta.data["abonado"])
+        self.assertIn("faltantes", respuesta.data["abonado"]["completitud"])
+
+    def test_documento_aportado_por_titular_anterior_queda_marcado(self):
+        respuesta = self._get()
+        documentos = {d["id_documento"]: d for d in respuesta.data["documentos"]}
+
+        self.assertTrue(
+            documentos[self.documento_titular_anterior.id_documento][
+                "aportante_titular_anterior"
+            ],
+        )
+        self.assertFalse(
+            documentos[self.documento_vigente.id_documento][
+                "aportante_titular_anterior"
+            ],
+        )
+
+    def test_historial_de_titulares_cerrados(self):
+        respuesta = self._get()
+        nombres = [
+            h["persona"]["nombre"] for h in respuesta.data["historial_titulares"]
+        ]
+        self.assertEqual(nombres, ["Rodrigo Mora Castro"])
+
+    def test_anulados_ocultos_por_defecto_y_visibles_con_el_filtro(self):
+        respuesta = self._get()
+        ids = {d["id_documento"] for d in respuesta.data["documentos"]}
+        self.assertNotIn(self.documento_anulado.id_documento, ids)
+
+        respuesta = self._get(mostrar_anulados="true")
+        documentos = {d["id_documento"]: d for d in respuesta.data["documentos"]}
+        anulado = documentos[self.documento_anulado.id_documento]
+        self.assertEqual(anulado["motivo_anulacion"], "Duplicado")
+        self.assertIsNotNone(anulado["fecha_anulacion"])
+
+    def test_filtro_por_tipo_de_documento(self):
+        respuesta = self._get(
+            id_tipo_documento=self.tipo_formulario.id_tipo_documento,
+        )
+        ids = {d["id_documento"] for d in respuesta.data["documentos"]}
+        self.assertEqual(ids, {self.documento_vigente.id_documento})
+
+    def test_filtro_por_nombre_identificador(self):
+        respuesta = self._get(nombre_identificador="nuevo")
+        ids = {d["id_documento"] for d in respuesta.data["documentos"]}
+        self.assertEqual(ids, {self.documento_vigente.id_documento})
+
+    def test_filtro_por_rango_de_fechas_usa_la_version_vigente(self):
+        respuesta = self._get(fecha_desde="2026-01-01", fecha_hasta="2026-12-31")
+        ids = {d["id_documento"] for d in respuesta.data["documentos"]}
+        self.assertEqual(ids, {self.documento_vigente.id_documento})
+
+    def test_fecha_invalida_responde_400(self):
+        respuesta = self._get(fecha_desde="no-es-fecha")
+        self.assertEqual(respuesta.status_code, 400)
+
+    def test_id_tipo_documento_no_numerico_responde_400(self):
+        respuesta = self._get(id_tipo_documento="abc")
+        self.assertEqual(respuesta.status_code, 400)
+
+
+class DarDeBajaYReactivarAbonadoTests(TestCase):
+    """D-03 (RF-17): no borra documentos ni el abonado; deja bitácora."""
+
+    def setUp(self):
+        self.cliente = APIClient()
+        self.cuenta = Cuenta.objects.create(
+            usuario="secretaria_baja",
+            hash_contrasena=make_password("Prueba2026!"),
+            perfil="SECRETARIA",
+        )
+        token = TokenCuenta.objects.create(cuenta=self.cuenta)
+        self.cliente.credentials(HTTP_AUTHORIZATION=f"Bearer {token.key}")
+
+        self.abonado = Abonado.objects.create(
+            numero_paja="0810", tipo_abonado=TipoAbonado.PERSONA_FISICA,
+        )
+
+    def test_dar_de_baja_exige_fecha(self):
+        respuesta = self.cliente.post(
+            reverse("abonados:dar_de_baja", args=["0810"]), {}, format="json",
+        )
+        self.assertEqual(respuesta.status_code, 400)
+
+    def test_dar_de_baja_cambia_estado_y_deja_bitacora(self):
+        respuesta = self.cliente.post(
+            reverse("abonados:dar_de_baja", args=["0810"]),
+            {"fecha_baja": "2026-11-13"},
+            format="json",
+        )
+        self.assertEqual(respuesta.status_code, 200)
+
+        self.abonado.refresh_from_db()
+        self.assertEqual(self.abonado.estado, "DE_BAJA")
+        self.assertEqual(self.abonado.fecha_baja, datetime.date(2026, 11, 13))
+
+        registro = RegistroBitacora.objects.get(
+            accion=AccionBitacora.BAJA,
+            elemento_afectado=f"abonado.id_abonado={self.abonado.id_abonado}",
+        )
+        self.assertEqual(registro.cuenta, self.cuenta)
+
+    def test_no_se_puede_dar_de_baja_dos_veces(self):
+        self.cliente.post(
+            reverse("abonados:dar_de_baja", args=["0810"]),
+            {"fecha_baja": "2026-11-13"},
+            format="json",
+        )
+        respuesta = self.cliente.post(
+            reverse("abonados:dar_de_baja", args=["0810"]),
+            {"fecha_baja": "2026-11-14"},
+            format="json",
+        )
+        self.assertEqual(respuesta.status_code, 400)
+
+    def test_reactivar_requiere_estar_de_baja(self):
+        respuesta = self.cliente.post(
+            reverse("abonados:reactivar", args=["0810"]), {}, format="json",
+        )
+        self.assertEqual(respuesta.status_code, 400)
+
+    def test_reactivar_cambia_estado_y_deja_bitacora(self):
+        self.cliente.post(
+            reverse("abonados:dar_de_baja", args=["0810"]),
+            {"fecha_baja": "2026-11-13"},
+            format="json",
+        )
+
+        respuesta = self.cliente.post(
+            reverse("abonados:reactivar", args=["0810"]), {}, format="json",
+        )
+        self.assertEqual(respuesta.status_code, 200)
+
+        self.abonado.refresh_from_db()
+        self.assertEqual(self.abonado.estado, "ACTIVO")
+        self.assertIsNone(self.abonado.fecha_baja)
+
+        registro = RegistroBitacora.objects.get(
+            accion=AccionBitacora.REACTIVACION,
+            elemento_afectado=f"abonado.id_abonado={self.abonado.id_abonado}",
+        )
+        self.assertEqual(registro.cuenta, self.cuenta)
+
+    def test_no_borra_documentos_al_dar_de_baja(self):
+        tipo = TipoDocumento.objects.get(nombre="Plano legible")
+        Documento.objects.create(abonado=self.abonado, tipo_documento=tipo)
+
+        self.cliente.post(
+            reverse("abonados:dar_de_baja", args=["0810"]),
+            {"fecha_baja": "2026-11-13"},
+            format="json",
+        )
+
+        self.assertEqual(
+            Documento.objects.filter(abonado=self.abonado).count(), 1,
+        )

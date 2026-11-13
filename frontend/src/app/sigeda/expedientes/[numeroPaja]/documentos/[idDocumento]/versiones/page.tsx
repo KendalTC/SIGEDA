@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { use, useEffect, useState } from "react";
 
+import { Button } from "@/components/ui/button";
 import { descargarVersion } from "@/features/sigeda/api";
 import { useSigedaAuth } from "@/features/sigeda/auth-context";
 
@@ -15,6 +16,7 @@ type Version = {
   fecha_documento: string;
   fecha_carga: string;
   hash_sha256: string;
+  cargada_por: string | null;
 };
 
 function formatearFecha(fechaIso: string): string {
@@ -86,6 +88,7 @@ export default function VersionesDocumentoPage({
             <th className="py-2">Versión</th>
             <th className="py-2">Fecha del documento</th>
             <th className="py-2">Cargada el</th>
+            <th className="py-2">Por</th>
             <th className="py-2">Archivo</th>
             <th className="py-2">
               <span className="sr-only">Acciones</span>
@@ -106,6 +109,7 @@ export default function VersionesDocumentoPage({
               <td className="py-2">
                 {new Date(version.fecha_carga).toLocaleString("es-CR")}
               </td>
+              <td className="py-2">{version.cargada_por ?? "—"}</td>
               <td className="py-2">
                 {version.nombre_original} ·{" "}
                 {(version.tamano_bytes / (1024 * 1024)).toFixed(1).replace(".", ",")} MB
@@ -123,6 +127,24 @@ export default function VersionesDocumentoPage({
           ))}
         </tbody>
       </table>
+
+      <div className="flex gap-3">
+        <Button
+          variant="secondary"
+          onClick={() => router.push(`/sigeda/expedientes/${numeroPaja}`)}
+        >
+          Volver al expediente
+        </Button>
+        <Button
+          onClick={() =>
+            router.push(
+              `/sigeda/expedientes/${numeroPaja}/cargar?nuevaVersionDe=${idDocumento}`,
+            )
+          }
+        >
+          Cargar nueva versión
+        </Button>
+      </div>
     </main>
   );
 }

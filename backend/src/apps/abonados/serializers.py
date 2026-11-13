@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from .models import Abonado, Persona, VinculoAbonado
+from .servicio_completitud import calcular_completitud
 
 
 class PersonaSerializer(serializers.ModelSerializer):
@@ -20,6 +21,7 @@ class VinculoAbonadoSerializer(serializers.ModelSerializer):
 class AbonadoSerializer(serializers.ModelSerializer):
     sector = serializers.CharField(source="sector.nombre", default=None)
     titular_vigente = serializers.SerializerMethodField()
+    completitud = serializers.SerializerMethodField()
 
     class Meta:
         model = Abonado
@@ -31,6 +33,7 @@ class AbonadoSerializer(serializers.ModelSerializer):
             "estado",
             "fecha_baja",
             "titular_vigente",
+            "completitud",
         ]
 
     def get_titular_vigente(self, abonado):
@@ -42,3 +45,8 @@ class AbonadoSerializer(serializers.ModelSerializer):
         )
 
         return PersonaSerializer(vinculo.persona).data if vinculo else None
+
+    def get_completitud(self, abonado):
+        """Q3 (RF-14): indicador breve para PAN-04; detalle en PAN-07."""
+
+        return calcular_completitud(abonado)

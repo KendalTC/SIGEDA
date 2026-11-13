@@ -63,6 +63,14 @@ export function FechaInput({
         const nuevoTexto = aplicarMascara(e.target.value);
         setTexto(nuevoTexto);
 
+        if (nuevoTexto === "") {
+          // Campo vaciado a propósito (filtros opcionales, p. ej. PAN-04):
+          // se avisa con "" en vez de dejar el iso anterior vigente por
+          // detrás de un campo que la usuaria ve vacío.
+          onChangeIso("");
+          return;
+        }
+
         const iso = textoAIso(nuevoTexto);
         if (iso) {
           onChangeIso(iso);

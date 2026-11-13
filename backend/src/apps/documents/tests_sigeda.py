@@ -17,7 +17,7 @@ from rest_framework.test import APIClient
 
 from apps.abonados.models import Abonado, Persona, TipoAbonado, VinculoAbonado
 from apps.accounts.models import Cuenta, TokenCuenta
-from apps.bitacora.models import AccionBitacora, RegistroBitacora
+from apps.bitacora.models import AccionBitacora, RegistroBitacora, RegistroModificacion
 from apps.configuration.models import TipoDocumento
 
 from .cifrado import AlmacenArchivosCifrados
@@ -376,3 +376,254 @@ class DocumentoConstraintsTests(TestCase):
                     fecha_documento=datetime.date(2026, 1, 1),
                     hash_sha256="0" * 64,
                 )
+
+
+class _ConCuentaAutenticadaTestCase(TestCase):
+    """Base con una cuenta y cliente autenticado, para D-01/D-02/PAN-13."""
+
+    def setUp(self):
+        self.cliente = APIClient()
+        self.cuenta = Cuenta.objects.create(
+            usuario="secretaria_doc",
+            hash_contrasena=make_password("Prueba2026!"),
+            perfil="SECRETARIA",
+        )
+        token = TokenCuenta.objects.create(cuenta=self.cuenta)
+        self.cliente.credentials(HTTP_AUTHORIZATION=f"Bearer {token.key}")
+
+        self.abonado = Abonado.objects.create(
+            numero_paja="0920", tipo_abonado=TipoAbonado.PERSONA_FISICA,
+        )
+        self.tipo_documento = TipoDocumento.objects.get(nombre="Plano legible")
+        self.otro_tipo_documento = TipoDocumento.objects.get(
+            nombre="Formulario de solicitud",
+        )
+        self.documento = Documento.objects.create(
+            abonado=self.abonado,
+            tipo_documento=self.tipo_documento,
+            nombre_identificador="original",
+        )
+
+
+class AnularDocumentoViewTests(_ConCuentaAutenticadaTestCase):
+    """D-01 Anular documento (RF-19): no se borra, queda ANULADO con motivo."""
+
+    def test_exige_motivo(self):
+        respuesta = self.cliente.post(
+            reverse("sigeda_documents:anular", args=[self.documento.id_documento]),
+            {"motivo": ""},
+            format="json",
+        )
+        self.assertEqual(respuesta.status_code, 400)
+
+        self.documento.refresh_from_db()
+        self.assertEqual(self.documento.estado, "VIGENTE")
+
+    def test_anula_y_deja_bitacora_con_registro_modificacion(self):
+        respuesta = self.cliente.post(
+            reverse("sigeda_documents:anular", args=[self.documento.id_documento]),
+            {"motivo": "Documento duplicado"},
+            format="json",
+        )
+        self.assertEqual(respuesta.status_code, 200)
+
+        self.documento.refresh_from_db()
+        self.assertEqual(self.documento.estado, "ANULADO")
+        self.assertEqual(self.documento.motivo_anulacion, "Documento duplicado")
+        self.assertIsNotNone(self.documento.fecha_anulacion)
+
+        registro = RegistroBitacora.objects.get(
+            accion=AccionBitacora.ANULACION,
+            elemento_afectado=f"documento.id_documento={self.documento.id_documento}",
+        )
+        self.assertEqual(registro.cuenta, self.cuenta)
+
+        modificacion = RegistroModificacion.objects.get(
+            registro_bitacora=registro, campo_modificado="documento.estado",
+        )
+        self.assertEqual(modificacion.valor_anterior, "VIGENTE")
+        self.assertEqual(modificacion.valor_nuevo, "ANULADO")
+
+    def test_no_se_puede_anular_dos_veces(self):
+        self.cliente.post(
+            reverse("sigeda_documents:anular", args=[self.documento.id_documento]),
+            {"motivo": "Primera anulación"},
+            format="json",
+        )
+        respuesta = self.cliente.post(
+            reverse("sigeda_documents:anular", args=[self.documento.id_documento]),
+            {"motivo": "Segunda anulación"},
+            format="json",
+        )
+        self.assertEqual(respuesta.status_code, 400)
+
+    def test_documento_inexistente_responde_404(self):
+        respuesta = self.cliente.post(
+            reverse("sigeda_documents:anular", args=[999999]),
+            {"motivo": "Lo que sea"},
+            format="json",
+        )
+        self.assertEqual(respuesta.status_code, 404)
+
+
+class EditarDatosDocumentoViewTests(_ConCuentaAutenticadaTestCase):
+    """D-02 Editar datos del documento (RF-22): tipo y nombre identificador."""
+
+    def test_exige_tipo_de_documento(self):
+        respuesta = self.cliente.post(
+            reverse(
+                "sigeda_documents:editar_datos", args=[self.documento.id_documento],
+            ),
+            {"id_tipo_documento": ""},
+            format="json",
+        )
+        self.assertEqual(respuesta.status_code, 400)
+
+    def test_tipo_de_documento_inexistente_responde_400(self):
+        respuesta = self.cliente.post(
+            reverse(
+                "sigeda_documents:editar_datos", args=[self.documento.id_documento],
+            ),
+            {"id_tipo_documento": 999999},
+            format="json",
+        )
+        self.assertEqual(respuesta.status_code, 400)
+
+    def test_edita_y_deja_bitacora_con_valor_anterior_y_nuevo(self):
+        respuesta = self.cliente.post(
+            reverse(
+                "sigeda_documents:editar_datos", args=[self.documento.id_documento],
+            ),
+            {
+                "id_tipo_documento": self.otro_tipo_documento.id_tipo_documento,
+                "nombre_identificador": "renombrado",
+            },
+            format="json",
+        )
+        self.assertEqual(respuesta.status_code, 200)
+
+        self.documento.refresh_from_db()
+        self.assertEqual(self.documento.tipo_documento, self.otro_tipo_documento)
+        self.assertEqual(self.documento.nombre_identificador, "renombrado")
+
+        registro = RegistroBitacora.objects.get(
+            accion=AccionBitacora.MODIFICACION,
+            elemento_afectado=f"documento.id_documento={self.documento.id_documento}",
+        )
+        self.assertEqual(registro.cuenta, self.cuenta)
+
+        campos = set(
+            RegistroModificacion.objects.filter(
+                registro_bitacora=registro,
+            ).values_list("campo_modificado", flat=True),
+        )
+        self.assertEqual(
+            campos,
+            {"documento.id_tipo_documento", "documento.nombre_identificador"},
+        )
+
+        nombre_modificado = RegistroModificacion.objects.get(
+            registro_bitacora=registro,
+            campo_modificado="documento.nombre_identificador",
+        )
+        self.assertEqual(nombre_modificado.valor_anterior, "original")
+        self.assertEqual(nombre_modificado.valor_nuevo, "renombrado")
+
+    def test_sin_cambios_reales_no_agrega_fila_a_la_bitacora(self):
+        registros_antes = RegistroBitacora.objects.count()
+
+        respuesta = self.cliente.post(
+            reverse(
+                "sigeda_documents:editar_datos", args=[self.documento.id_documento],
+            ),
+            {
+                "id_tipo_documento": self.tipo_documento.id_tipo_documento,
+                "nombre_identificador": "original",
+            },
+            format="json",
+        )
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertEqual(RegistroBitacora.objects.count(), registros_antes)
+
+
+def _raiz_prueba_v13():
+    return str(settings.BASE_DIR / "almacen_cifrado_test_v13")
+
+
+@override_settings(DOCUMENT_STORAGE_ROOT=_raiz_prueba_v13())
+class VersionesDocumentoCargadaPorTests(TestCase):
+    """PAN-13: `cargada_por` se deriva de la bitácora por posición."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        shutil.rmtree(_raiz_prueba_v13(), ignore_errors=True)
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(_raiz_prueba_v13(), ignore_errors=True)
+        super().tearDownClass()
+
+    def setUp(self):
+        self.abonado = Abonado.objects.create(
+            numero_paja="0930", tipo_abonado=TipoAbonado.PERSONA_FISICA,
+        )
+        self.titular = Persona.objects.create(nombre="Ana Lucía Mora Vega")
+        VinculoAbonado.objects.create(
+            abonado=self.abonado,
+            persona=self.titular,
+            fecha_inicio=datetime.date(2020, 1, 1),
+            rol="TITULAR",
+        )
+        self.secretaria = Cuenta.objects.create(
+            usuario="secretaria_v13",
+            hash_contrasena=make_password("Prueba2026!"),
+            perfil="SECRETARIA",
+        )
+        self.administracion = Cuenta.objects.create(
+            usuario="administracion_v13",
+            hash_contrasena=make_password("Prueba2026!"),
+            perfil="ADMINISTRADORA",
+        )
+        self.tipo_documento = TipoDocumento.objects.get(nombre="Plano legible")
+        self.controlador = ControladorDocumentos()
+
+        self.cliente = APIClient()
+        token = TokenCuenta.objects.create(cuenta=self.secretaria)
+        self.cliente.credentials(HTTP_AUTHORIZATION=f"Bearer {token.key}")
+
+    def test_cargada_por_con_dos_versiones_de_cuentas_distintas(self):
+        primera = self.controlador.cargar_documento(
+            abonado=self.abonado,
+            tipo_documento=self.tipo_documento,
+            persona=self.titular,
+            nombre_identificador="plano",
+            fecha_documento=datetime.date(2026, 1, 1),
+            nombre_original="plano_v1.pdf",
+            contenido=PDF_MINIMO,
+            cuenta=self.secretaria,
+        )
+        self.controlador.cargar_nueva_version(
+            documento=primera.documento,
+            fecha_documento=datetime.date(2026, 2, 1),
+            nombre_original="plano_v2.pdf",
+            contenido=PDF_MINIMO + b" v2",
+            cuenta=self.administracion,
+        )
+
+        respuesta = self.cliente.get(
+            reverse(
+                "sigeda_documents:versiones", args=[primera.documento.id_documento],
+            ),
+        )
+        self.assertEqual(respuesta.status_code, 200)
+
+        versiones_por_numero = {
+            v["numero_version"]: v for v in respuesta.data["versiones"]
+        }
+        self.assertEqual(
+            versiones_por_numero[1]["cargada_por"], "secretaria_v13",
+        )
+        self.assertEqual(
+            versiones_por_numero[2]["cargada_por"], "administracion_v13",
+        )

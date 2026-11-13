@@ -1,7 +1,7 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { use, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { use, useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { FechaInput } from "@/components/forms/fecha-input";
@@ -55,6 +55,8 @@ export default function CargarDocumentoPage({
 }) {
   const { numeroPaja } = use(params);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const nuevaVersionDeParam = searchParams.get("nuevaVersionDe");
   const { sesion, cargando: cargandoSesion } = useSigedaAuth();
 
   const [expediente, setExpediente] = useState<Expediente | null>(null);
@@ -85,13 +87,29 @@ export default function CargarDocumentoPage({
         ]);
         setExpediente(datosExpediente);
         setTipos(catalogoTipos);
+
+        // Llega desde PAN-04 o PAN-13 ("Nueva versión") con el documento
+        // ya elegido: se preselecciona el modo y el documento, sin que la
+        // usuaria tenga que volver a buscarlo.
+        if (nuevaVersionDeParam) {
+          const idBuscado = Number(nuevaVersionDeParam);
+          const documentoPreseleccionado = datosExpediente.documentos.find(
+            (d) => d.id_documento === idBuscado && d.version_vigente,
+          );
+
+          if (documentoPreseleccionado) {
+            setModo("nueva_version");
+            setDocumentoSeleccionado(documentoPreseleccionado);
+          }
+        }
+
         setEstado("listo");
       } catch {
         setMensajeLote("No fue posible cargar los datos del expediente.");
         setEstado("error_lote");
       }
     })();
-  }, [cargandoSesion, sesion, numeroPaja, router]);
+  }, [cargandoSesion, sesion, numeroPaja, router, nuevaVersionDeParam]);
 
   const personaTitularId = expediente?.abonado.titular_vigente?.id_persona ?? "";
 
@@ -186,6 +204,24 @@ export default function CargarDocumentoPage({
 
       setEstado("error_lote");
     }
+  }
+
+  // --- D-07 ¿Salir sin guardar? --------------------------------------
+  const dialogSalirRef = useRef<HTMLDialogElement>(null);
+  const hayDatosSinGuardar = filas.length > 0 || documentoSeleccionado !== null;
+
+  function manejarCancelar() {
+    if (hayDatosSinGuardar) {
+      dialogSalirRef.current?.showModal();
+      return;
+    }
+
+    router.push(`/sigeda/expedientes/${numeroPaja}`);
+  }
+
+  function confirmarSalirSinGuardar() {
+    dialogSalirRef.current?.close();
+    router.push(`/sigeda/expedientes/${numeroPaja}`);
   }
 
   if (cargandoSesion || estado === "cargando_datos") {
@@ -538,13 +574,38 @@ export default function CargarDocumentoPage({
         >
           Guardar documentos
         </Button>
-        <Button
-          variant="secondary"
-          onClick={() => router.push(`/sigeda/expedientes/${numeroPaja}`)}
-        >
+        <Button variant="secondary" onClick={manejarCancelar}>
           Cancelar
         </Button>
       </div>
+
+      {/* D-07 ¿Salir sin guardar? */}
+      <dialog
+        ref={dialogSalirRef}
+        aria-labelledby="d07-titulo"
+        className="m-auto w-[min(460px,calc(100vw-32px))] rounded-[var(--radius-xl)] border border-[var(--color-border)] bg-background p-6 text-foreground shadow-[var(--shadow-lg)] backdrop:bg-[rgb(15_23_42_/_45%)]"
+      >
+        <div className="flex flex-col gap-4">
+          <h2 id="d07-titulo">¿Salir sin guardar?</h2>
+          <p>
+            {filas.length > 0
+              ? `Eligió ${filas.length} archivo${filas.length === 1 ? "" : "s"} y escribió sus datos. Si sale ahora, no se guarda nada.`
+              : "Eligió el documento para la nueva versión. Si sale ahora, no se guarda nada."}
+          </p>
+          <div className="flex justify-end gap-3">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => dialogSalirRef.current?.close()}
+            >
+              Seguir cargando
+            </Button>
+            <Button type="button" variant="danger" onClick={confirmarSalirSinGuardar}>
+              Salir sin guardar
+            </Button>
+          </div>
+        </div>
+      </dialog>
     </main>
   );
 }

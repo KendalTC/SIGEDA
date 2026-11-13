@@ -9,6 +9,7 @@ import json
 
 from django.db import transaction
 from django.http import HttpResponse
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
@@ -16,11 +17,13 @@ from rest_framework.views import APIView
 
 from apps.abonados.models import Abonado, Persona
 from apps.accounts.sigeda_auth import AutenticacionCuenta, CuentaAutenticadaPermission
+from apps.bitacora.models import AccionBitacora, RegistroBitacora
+from apps.bitacora.servicio import registrar, registrar_modificaciones
 from apps.configuration.models import TipoDocumento
 
 from .cifrado import AlmacenArchivosCifrados, IntegridadArchivoError
 from .controlador import ControladorDocumentos, ValidacionArchivoError
-from .models import Documento, VersionDocumento
+from .models import Documento, EstadoDocumento, VersionDocumento
 from .repositorio import RepositorioDocumentos
 from .serializers import VersionDocumentoSerializer
 
@@ -236,6 +239,136 @@ class CargarDocumentosView(APIView):
         )
 
 
+class AnularDocumentoView(APIView):
+    """D-01 Anular documento (RF-19): no se borra, solo cambia de estado."""
+
+    authentication_classes = [AutenticacionCuenta]
+    permission_classes = [CuentaAutenticadaPermission]
+
+    def post(self, request, id_documento):
+        try:
+            documento = Documento.objects.get(pk=id_documento)
+        except Documento.DoesNotExist:
+            return Response(
+                {"detail": "El documento indicado no existe."}, status=404,
+            )
+
+        motivo = (request.data.get("motivo") or "").strip()
+
+        if not motivo:
+            return Response(
+                {"motivo": ["Escriba el motivo de la anulación."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if documento.estado == EstadoDocumento.ANULADO:
+            return Response(
+                {"detail": "Este documento ya está anulado."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        estado_anterior = documento.estado
+
+        with transaction.atomic():
+            documento.estado = EstadoDocumento.ANULADO
+            documento.motivo_anulacion = motivo
+            documento.fecha_anulacion = timezone.now()
+            documento.save(
+                update_fields=["estado", "motivo_anulacion", "fecha_anulacion"],
+            )
+
+            registro = registrar(
+                cuenta=request.user,
+                accion=AccionBitacora.ANULACION,
+                elemento_afectado=f"documento.id_documento={documento.id_documento}",
+                id_abonado=documento.abonado_id,
+            )
+            registrar_modificaciones(
+                registro,
+                {"documento.estado": (estado_anterior, documento.estado)},
+            )
+
+        return Response(
+            {
+                "detail": "El documento quedó anulado.",
+                "id_documento": documento.id_documento,
+                "estado": documento.estado,
+                "motivo_anulacion": documento.motivo_anulacion,
+                "fecha_anulacion": documento.fecha_anulacion,
+            },
+        )
+
+
+class EditarDatosDocumentoView(APIView):
+    """D-02 Editar datos del documento (RF-22): tipo y nombre identificador."""
+
+    authentication_classes = [AutenticacionCuenta]
+    permission_classes = [CuentaAutenticadaPermission]
+
+    def post(self, request, id_documento):
+        try:
+            documento = Documento.objects.select_related("tipo_documento").get(
+                pk=id_documento,
+            )
+        except Documento.DoesNotExist:
+            return Response(
+                {"detail": "El documento indicado no existe."}, status=404,
+            )
+
+        id_tipo_documento = request.data.get("id_tipo_documento")
+
+        if not id_tipo_documento:
+            return Response(
+                {"id_tipo_documento": ["El tipo de documento es obligatorio."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            tipo_documento = TipoDocumento.objects.get(pk=id_tipo_documento)
+        except (TipoDocumento.DoesNotExist, ValueError, TypeError):
+            return Response(
+                {"id_tipo_documento": ["El tipo de documento elegido no existe."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        nombre_identificador_nuevo = request.data.get("nombre_identificador") or None
+
+        cambios = {}
+
+        if documento.tipo_documento_id != tipo_documento.id_tipo_documento:
+            cambios["documento.id_tipo_documento"] = (
+                documento.tipo_documento_id, tipo_documento.id_tipo_documento,
+            )
+
+        if documento.nombre_identificador != nombre_identificador_nuevo:
+            cambios["documento.nombre_identificador"] = (
+                documento.nombre_identificador, nombre_identificador_nuevo,
+            )
+
+        with transaction.atomic():
+            documento.tipo_documento = tipo_documento
+            documento.nombre_identificador = nombre_identificador_nuevo
+            documento.save(update_fields=["tipo_documento", "nombre_identificador"])
+
+            if cambios:
+                registro = registrar(
+                    cuenta=request.user,
+                    accion=AccionBitacora.MODIFICACION,
+                    elemento_afectado=f"documento.id_documento={documento.id_documento}",
+                    id_abonado=documento.abonado_id,
+                )
+                registrar_modificaciones(registro, cambios)
+
+        return Response(
+            {
+                "detail": "Los datos del documento quedaron actualizados.",
+                "id_documento": documento.id_documento,
+                "tipo_documento": tipo_documento.nombre,
+                "nombre_identificador": documento.nombre_identificador,
+            },
+        )
+
+
 class VersionesDocumentoView(APIView):
     authentication_classes = [AutenticacionCuenta]
     permission_classes = [CuentaAutenticadaPermission]
@@ -250,12 +383,42 @@ class VersionesDocumentoView(APIView):
                 {"detail": "El documento indicado no existe."}, status=404,
             )
 
-        versiones = RepositorioDocumentos().listar_versiones(documento)
+        versiones = list(RepositorioDocumentos().listar_versiones(documento))
+
+        # PAN-13 "Por": `version_documento` no tiene columna de usuario.
+        # Se deriva emparejando, por posición (numero_version - 1), las
+        # filas de bitácora CREACION de este documento ordenadas por
+        # fecha_hora ascendente: `ControladorDocumentos` inserta
+        # exactamente una fila de bitácora por versión creada, en el
+        # mismo orden en que crece numero_version, dentro de la misma
+        # transacción — así que esa posición es exacta.
+        registros_creacion = list(
+            RegistroBitacora.objects.filter(
+                accion=AccionBitacora.CREACION,
+                elemento_afectado=f"documento.id_documento={documento.id_documento}",
+            )
+            .select_related("cuenta")
+            .order_by("fecha_hora", "id_registro_bitacora")
+        )
+
+        datos_versiones = []
+
+        for version in versiones:
+            cargada_por = None
+            indice = version.numero_version - 1
+
+            if 0 <= indice < len(registros_creacion):
+                cuenta = registros_creacion[indice].cuenta
+                cargada_por = cuenta.usuario if cuenta else None
+
+            dato = VersionDocumentoSerializer(version).data
+            dato["cargada_por"] = cargada_por
+            datos_versiones.append(dato)
 
         return Response(
             {
                 "tipo_documento": documento.tipo_documento.nombre,
-                "versiones": VersionDocumentoSerializer(versiones, many=True).data,
+                "versiones": datos_versiones,
             },
         )
 
