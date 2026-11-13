@@ -65,6 +65,10 @@ class TokenCuenta(models.Model):
         Cuenta, on_delete=models.CASCADE, related_name="token",
     )
     creado = models.DateTimeField(auto_now_add=True)
+    # RNF-09: cierre de sesión a los 15 minutos de inactividad real.
+    # Cualquier llamada autenticada que pase por `AutenticacionCuenta`
+    # la refresca (ver `sigeda_auth.py`).
+    ultima_actividad = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return f"token de {self.cuenta.usuario}"

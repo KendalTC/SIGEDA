@@ -8,16 +8,47 @@ import {
 import type {
   CargaDocumentosError,
   CargaDocumentosExito,
+  ContrasenaTemporalGenerada,
   CriteriosBusqueda,
   Cuenta,
   Expediente,
+  FiltrosExpediente,
   MetadatoArchivo,
+  OtraCuenta,
   RespuestaBusqueda,
   SectorCatalogo,
   TipoDocumentoCatalogo,
 } from "./types";
+import { borrarSesionLocal } from "./sesion-storage";
 
 const TIMEOUT_MS = 20_000;
+
+/**
+ * RNF-09: si el servidor ya cerró la sesión por inactividad (o el
+ * token ya no es válido por cualquier otro motivo), `AutenticacionCuenta`
+ * lanza `AuthenticationFailed`, que DRF convierte en **403** (no 401)
+ * porque ese autenticador no define `authenticate_header()` —
+ * convención ya existente en el proyecto, confirmada con el agente de
+ * backend. Acá se limpia la sesión guardada y se manda a la usuaria
+ * de vuelta a iniciar sesión, sin esperar a que el vigilante del
+ * cliente lo note (p. ej. la laptop estuvo suspendida más de 15
+ * minutos).
+ *
+ * SUPUESTO: por ahora cualquier 403 en una llamada con `token` se
+ * trata como sesión vencida, porque las dos cuentas tienen los mismos
+ * permisos (RN-09) y hoy no hay ningún endpoint que devuelva 403 por
+ * un permiso denegado de verdad. Si un incremento futuro agrega uno
+ * (p. ej. restaurar respaldos, exclusivo de Administración, según la
+ * excepción propuesta a RN-09), esta regla habrá que afinarla para no
+ * confundir "permiso denegado" con "sesión vencida".
+ */
+function manejarSesionExpirada(): void {
+  borrarSesionLocal();
+
+  if (typeof window !== "undefined") {
+    window.location.assign("/sigeda/login");
+  }
+}
 
 async function sigedaFetch<T>(
   path: string,
@@ -51,6 +82,10 @@ async function sigedaFetch<T>(
           : await response.text();
 
     if (!response.ok) {
+      if (response.status === 403 && token) {
+        manejarSesionExpirada();
+      }
+
       throw new ApiError({
         message: getApiErrorMessage(payload),
         status: response.status,
@@ -92,10 +127,123 @@ export function sigedaLogout(token: string) {
   });
 }
 
-export function obtenerExpediente(token: string, numeroPaja: string) {
+export function obtenerMiCuenta(token: string) {
+  return sigedaFetch<Cuenta>("/api/sigeda/auth/me/", { token });
+}
+
+export function obtenerOtraCuenta(token: string) {
+  return sigedaFetch<OtraCuenta>("/api/sigeda/auth/otra-cuenta/", { token });
+}
+
+export function asignarContrasenaTemporal(token: string) {
+  return sigedaFetch<ContrasenaTemporalGenerada>(
+    "/api/sigeda/auth/asignar-contrasena-temporal/",
+    { method: "POST", token },
+  );
+}
+
+export function cambiarContrasena(
+  token: string,
+  datos: {
+    nueva_contrasena: string;
+    contrasena_actual?: string;
+    repetir_contrasena?: string;
+  },
+) {
+  return sigedaFetch<{ token: string }>(
+    "/api/sigeda/auth/cambiar-contrasena/",
+    {
+      method: "POST",
+      token,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(datos),
+    },
+  );
+}
+
+export function obtenerExpediente(
+  token: string,
+  numeroPaja: string,
+  filtros?: FiltrosExpediente,
+) {
+  const params = new URLSearchParams();
+
+  if (filtros?.id_tipo_documento) {
+    params.set("id_tipo_documento", String(filtros.id_tipo_documento));
+  }
+  if (filtros?.nombre_identificador) {
+    params.set("nombre_identificador", filtros.nombre_identificador);
+  }
+  if (filtros?.fecha_desde) params.set("fecha_desde", filtros.fecha_desde);
+  if (filtros?.fecha_hasta) params.set("fecha_hasta", filtros.fecha_hasta);
+  if (filtros?.mostrar_anulados) params.set("mostrar_anulados", "true");
+
+  const query = params.toString();
+
   return sigedaFetch<Expediente>(
-    `/api/sigeda/abonados/${encodeURIComponent(numeroPaja)}/expediente/`,
+    `/api/sigeda/abonados/${encodeURIComponent(numeroPaja)}/expediente/` +
+      (query ? `?${query}` : ""),
     { token },
+  );
+}
+
+/** D-01 / RF-19: anular un documento (no se borra). */
+export function anularDocumento(
+  token: string,
+  idDocumento: number,
+  motivo: string,
+) {
+  return sigedaFetch<{ detail: string }>(
+    `/api/sigeda/documentos/${idDocumento}/anular/`,
+    {
+      method: "POST",
+      token,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ motivo }),
+    },
+  );
+}
+
+/** D-02 / RF-22: tipo y nombre identificador del documento (no toca el
+ * archivo, la fecha del documento ni las versiones anteriores). */
+export function editarDatosDocumento(
+  token: string,
+  idDocumento: number,
+  datos: { id_tipo_documento: number; nombre_identificador: string | null },
+) {
+  return sigedaFetch<{ detail: string }>(
+    `/api/sigeda/documentos/${idDocumento}/editar-datos/`,
+    {
+      method: "POST",
+      token,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(datos),
+    },
+  );
+}
+
+/** D-03 / RF-17: dar de baja (no borra documentos; RN-08). */
+export function darDeBajaAbonado(
+  token: string,
+  numeroPaja: string,
+  fechaBaja: string,
+) {
+  return sigedaFetch<{ detail: string }>(
+    `/api/sigeda/abonados/${encodeURIComponent(numeroPaja)}/dar-de-baja/`,
+    {
+      method: "POST",
+      token,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fecha_baja: fechaBaja }),
+    },
+  );
+}
+
+/** D-03 / RF-17: reactivar un abonado de baja. */
+export function reactivarAbonado(token: string, numeroPaja: string) {
+  return sigedaFetch<{ detail: string }>(
+    `/api/sigeda/abonados/${encodeURIComponent(numeroPaja)}/reactivar/`,
+    { method: "POST", token },
   );
 }
 

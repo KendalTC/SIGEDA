@@ -4,11 +4,19 @@ Autenticación de `Cuenta` para los endpoints nuevos de SIGEDA. No usa
 para no tocar el login de las cuentas de negocio heredadas de LICS.
 """
 
+from datetime import timedelta
+
+from django.utils import timezone
 from rest_framework import authentication, exceptions, permissions
 
 from .models import Cuenta, TokenCuenta
 
 PREFIJO_TOKEN = "Bearer"
+MINUTOS_INACTIVIDAD = 15
+MENSAJE_INACTIVIDAD = (
+    "La sesión se cerró por 15 minutos de inactividad. Inicie sesión "
+    "de nuevo."
+)
 
 
 class AutenticacionCuenta(authentication.BaseAuthentication):
@@ -26,6 +34,19 @@ class AutenticacionCuenta(authentication.BaseAuthentication):
             raise exceptions.AuthenticationFailed(
                 "La sesión no es válida o ya venció. Inicie sesión de nuevo.",
             )
+
+        # RNF-09: cualquier llamada autenticada real cuenta como
+        # actividad. Si ya pasaron 15 minutos desde la última, la
+        # sesión se cierra de verdad en el servidor (no solo en el
+        # cliente).
+        if timezone.now() - token.ultima_actividad > timedelta(
+            minutes=MINUTOS_INACTIVIDAD,
+        ):
+            token.delete()
+
+            raise exceptions.AuthenticationFailed(MENSAJE_INACTIVIDAD)
+
+        token.save(update_fields=["ultima_actividad"])
 
         return (token.cuenta, token)
 

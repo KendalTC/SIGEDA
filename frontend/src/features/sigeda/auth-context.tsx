@@ -8,29 +8,30 @@ import {
 } from "react";
 
 import { sigedaLogin, sigedaLogout } from "./api";
-import type { Cuenta } from "./types";
+import {
+  borrarSesionLocal,
+  guardarSesionLocal,
+  leerSesionGuardada,
+  type SesionGuardada,
+} from "./sesion-storage";
 
-const STORAGE_KEY = "sigeda_sesion";
-
-type Sesion = { token: string; cuenta: Cuenta };
+export type Sesion = SesionGuardada;
 
 type SigedaAuthContextValue = {
   sesion: Sesion | null;
   cargando: boolean;
-  iniciarSesion: (usuario: string, contrasena: string) => Promise<void>;
+  iniciarSesion: (usuario: string, contrasena: string) => Promise<Sesion>;
+  /**
+   * Fija la sesión directamente, sin llamar a `/auth/login/`. Lo usa
+   * PAN-01 tras terminar el flujo "Cree su contraseña" (RF-20): el
+   * token nuevo ya lo dio `cambiar-contrasena/`, no hay que volver a
+   * autenticarse.
+   */
+  establecerSesion: (sesion: Sesion) => void;
   cerrarSesion: () => Promise<void>;
 };
 
 const SigedaAuthContext = createContext<SigedaAuthContextValue | null>(null);
-
-function leerSesionGuardada(): Sesion | null {
-  try {
-    const bruto = window.localStorage.getItem(STORAGE_KEY);
-    return bruto ? (JSON.parse(bruto) as Sesion) : null;
-  } catch {
-    return null;
-  }
-}
 
 export function SigedaAuthProvider({
   children,
@@ -48,13 +49,14 @@ export function SigedaAuthProvider({
     const nuevaSesion: Sesion = { token: respuesta.token, cuenta: respuesta.cuenta };
 
     setSesion(nuevaSesion);
+    guardarSesionLocal(nuevaSesion);
 
-    try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nuevaSesion));
-    } catch {
-      // Almacenamiento no disponible (ej. navegación privada): la
-      // sesión sigue viva en memoria para esta pestaña.
-    }
+    return nuevaSesion;
+  };
+
+  const establecerSesion = (nuevaSesion: Sesion) => {
+    setSesion(nuevaSesion);
+    guardarSesionLocal(nuevaSesion);
   };
 
   const cerrarSesion = async () => {
@@ -67,17 +69,12 @@ export function SigedaAuthProvider({
     }
 
     setSesion(null);
-
-    try {
-      window.localStorage.removeItem(STORAGE_KEY);
-    } catch {
-      // Sin almacenamiento disponible: nada que limpiar.
-    }
+    borrarSesionLocal();
   };
 
   return (
     <SigedaAuthContext.Provider
-      value={{ sesion, cargando, iniciarSesion, cerrarSesion }}
+      value={{ sesion, cargando, iniciarSesion, establecerSesion, cerrarSesion }}
     >
       {children}
     </SigedaAuthContext.Provider>
