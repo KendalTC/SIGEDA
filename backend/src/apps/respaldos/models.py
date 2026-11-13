@@ -113,3 +113,45 @@ class CopiaRespaldo(models.Model):
 
     def __str__(self):
         return f"{self.respaldo_id} · {self.destino}"
+
+
+class ResultadoPruebaRestauracion(models.TextChoices):
+    EXITOSA = "EXITOSA", "Exitosa"
+    FALLIDA = "FALLIDA", "Fallida"
+
+
+class PruebaRestauracion(models.Model):
+    """
+    Tabla propuesta (SUPUESTO; Anexo B de Prototipos_Interfaz_SIGEDA_v0.3,
+    sección 11 "Pendientes con la administradora"): registro manual de
+    la prueba trimestral de restauración. No dispara una restauración
+    real — es la bitácora de que alguien la hizo a mano, en qué
+    computadora y con qué resultado.
+    """
+
+    id_prueba_restauracion = models.BigAutoField(primary_key=True)
+    respaldo = models.ForeignKey(
+        Respaldo,
+        on_delete=models.RESTRICT,
+        db_column="id_respaldo",
+        related_name="pruebas_restauracion",
+    )
+    fecha = models.DateField()
+    computadora_usada = models.CharField(max_length=200)
+    resultado = models.CharField(
+        max_length=10, choices=ResultadoPruebaRestauracion.choices,
+    )
+    observaciones = models.TextField(null=True, blank=True)
+
+    class Meta:
+        db_table = "prueba_restauracion"
+        ordering = ["-fecha", "-id_prueba_restauracion"]
+        constraints = [
+            CheckConstraint(
+                condition=Q(resultado__in=ResultadoPruebaRestauracion.values),
+                name="prueba_restauracion_resultado_dominio",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.fecha} · {self.respaldo_id} · {self.resultado}"

@@ -186,3 +186,20 @@ DOCUMENT_STORAGE_ROOT = env(
     "DOCUMENT_STORAGE_ROOT",
     default=str(BASE_DIR / "almacen_cifrado"),
 )
+
+# -----------------------------------------------------------------------------
+# SIGEDA: respaldo y restauración (RF-16, ADR-03)
+# -----------------------------------------------------------------------------
+
+# SUPUESTO de entorno (igual que DOCUMENT_ENCRYPTION_KEY_B64 arriba):
+# "disco externo" y "OneDrive" son, en este entorno de desarrollo,
+# rutas de carpeta configurables por variable de entorno — no hay una
+# unidad USB real ni una licencia de OneDrive confirmada (S-10) que
+# probar aquí. Si una no está configurada, ese destino de copia_respaldo
+# queda PENDIENTE y no hace fallar el respaldo completo.
+SIGEDA_BACKUP_DISCO_EXTERNO_DIR = env(
+    "SIGEDA_BACKUP_DISCO_EXTERNO_DIR", default=None,
+)
+SIGEDA_BACKUP_ONEDRIVE_DIR = env(
+    "SIGEDA_BACKUP_ONEDRIVE_DIR", default=None,
+)

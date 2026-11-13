@@ -236,3 +236,87 @@ export type CambiarTitularDatos = {
   persona: PersonaReferencia;
   fecha_cambio: string;
 };
+
+// --- RF-16 Respaldo y restauración (PAN-08, D-05) -------------------
+
+export type TipoRespaldo = "AUTOMATICO" | "MANUAL";
+export type EstadoRespaldo = "COMPLETO" | "PENDIENTE" | "FALLIDO";
+export type DestinoCopiaRespaldo = "DISCO_EXTERNO" | "ONEDRIVE";
+export type EstadoCopiaRespaldo = "PENDIENTE" | "VERIFICADA" | "FALLIDA";
+
+export type CopiaRespaldo = {
+  destino: DestinoCopiaRespaldo;
+  estado: EstadoCopiaRespaldo;
+  fecha_hora_verificacion: string | null;
+};
+
+export type Respaldo = {
+  id_respaldo: number;
+  fecha_hora: string;
+  tipo: TipoRespaldo;
+  estado: EstadoRespaldo;
+  nombre_paquete: string | null;
+  hash_sha256: string | null;
+  tamano_bytes: number | null;
+  copias: CopiaRespaldo[];
+};
+
+/** `GET /api/sigeda/respaldos/`. SUPUESTO de la forma exacta del
+ * resumen: el backend se construye en paralelo y puede nombrar estos
+ * campos distinto o no mandarlos todos. La insignia y PAN-08 recalculan
+ * lo que necesitan a partir de `respaldos` (ver `respaldos-estado.ts`)
+ * para no depender de la redacción exacta que mande el backend; lo que
+ * sí venga en `resumen` se usa como complemento (p. ej. la ruta de
+ * OneDrive, que no se puede derivar de la lista). */
+export type ResumenRespaldos = {
+  estado_global?: "completo" | "pendiente" | "fallido" | "sin_respaldos";
+  disco_externo_configurado?: boolean;
+  onedrive_configurado?: boolean;
+  onedrive_ruta?: string | null;
+  proximo_automatico?: string | null;
+  archivos_en_cuarentena?: number;
+};
+
+export type RespuestaRespaldos = {
+  resumen?: ResumenRespaldos;
+  respaldos: Respaldo[];
+};
+
+/** `GET /api/sigeda/respaldos/cuarentena/`: archivos físicos en el
+ * almacén sin registro en `version_documento` (p. ej. tras un corte de
+ * luz durante una carga). SUPUESTO de nombres de campo exactos. */
+export type ArchivoCuarentena = {
+  nombre_archivo: string;
+  tamano_bytes: number;
+  fecha_deteccion: string;
+  motivo: string;
+};
+
+export type ResultadoPruebaRestauracion = "EXITOSA" | "CON_PROBLEMAS";
+
+/** `prueba_restauracion` (tabla propuesta, CLAUDE.md sección 9): registro
+ * manual, no una ejecución automática. SUPUESTO de nombres de campo. */
+export type PruebaRestauracion = {
+  id_prueba_restauracion: number;
+  fecha: string;
+  id_respaldo: number;
+  respaldo_descripcion?: string;
+  computadora_usada: string;
+  resultado: ResultadoPruebaRestauracion;
+  observaciones: string | null;
+};
+
+export type DatosPruebaRestauracion = {
+  fecha: string;
+  id_respaldo: number;
+  computadora_usada: string;
+  resultado: ResultadoPruebaRestauracion;
+  observaciones: string | null;
+};
+
+/** D-05: los 4 campos de confirmación, en el orden exacto de la ficha. */
+export type DatosRestaurar = {
+  clave_cifrado: string;
+  contrasena_administracion: string;
+  confirmacion: string;
+};

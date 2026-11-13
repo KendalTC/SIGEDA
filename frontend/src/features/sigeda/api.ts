@@ -8,12 +8,15 @@ import {
 import type {
   AgregarPersonaDatos,
   AltaAbonadoDatos,
+  ArchivoCuarentena,
   CambiarTitularDatos,
   CargaDocumentosError,
   CargaDocumentosExito,
   ContrasenaTemporalGenerada,
   CriteriosBusqueda,
   Cuenta,
+  DatosPruebaRestauracion,
+  DatosRestaurar,
   Expediente,
   FiltrosExpediente,
   MetadatoArchivo,
@@ -22,7 +25,10 @@ import type {
   PersonaBusqueda,
   PersonaExistenteConflicto,
   PersonaReferencia,
+  PruebaRestauracion,
+  Respaldo,
   RespuestaBusqueda,
+  RespuestaRespaldos,
   SectorCatalogo,
   TipoDocumentoCatalogo,
 } from "./types";
@@ -483,6 +489,75 @@ export function cambiarTitular(
         ...personaReferenciaABody(datos.persona),
         fecha_cambio: datos.fecha_cambio,
       }),
+    },
+  );
+}
+
+// --- RF-16 Respaldo y restauración (PAN-08, D-05) -------------------
+
+/** PAN-08 e insignia global: lista de respaldos con sus copias, más el
+ * resumen para la insignia (ver SUPUESTO en `types.ts`). */
+export function obtenerRespaldos(token: string) {
+  return sigedaFetch<RespuestaRespaldos>("/api/sigeda/respaldos/", { token });
+}
+
+/** "Respaldar ahora": respaldo manual inmediato (empaqueta la base y el
+ * almacén de documentos; puede tardar varios segundos). */
+export function crearRespaldoManual(token: string) {
+  return sigedaFetch<Respaldo>("/api/sigeda/respaldos/manual/", {
+    method: "POST",
+    token,
+  });
+}
+
+/** D-05 Restaurar un respaldo. Operación destructiva: reemplaza la base
+ * y el almacén completos por los del respaldo elegido (la bitácora no
+ * se borra, RNF-11). NUNCA se llama en pruebas contra el entorno de
+ * desarrollo compartido. */
+export function restaurarRespaldo(
+  token: string,
+  idRespaldo: number,
+  datos: DatosRestaurar,
+) {
+  return sigedaFetch<{ detail: string }>(
+    `/api/sigeda/respaldos/${idRespaldo}/restaurar/`,
+    {
+      method: "POST",
+      token,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(datos),
+    },
+  );
+}
+
+/** Sub-pantalla "Archivos en cuarentena". */
+export function obtenerCuarentena(token: string) {
+  return sigedaFetch<ArchivoCuarentena[]>(
+    "/api/sigeda/respaldos/cuarentena/",
+    { token },
+  );
+}
+
+/** Sub-pantalla "Registrar una prueba de restauración": listado para el
+ * historial debajo del formulario. */
+export function listarPruebasRestauracion(token: string) {
+  return sigedaFetch<PruebaRestauracion[]>(
+    "/api/sigeda/respaldos/pruebas-restauracion/",
+    { token },
+  );
+}
+
+export function registrarPruebaRestauracion(
+  token: string,
+  datos: DatosPruebaRestauracion,
+) {
+  return sigedaFetch<PruebaRestauracion>(
+    "/api/sigeda/respaldos/pruebas-restauracion/",
+    {
+      method: "POST",
+      token,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(datos),
     },
   );
 }

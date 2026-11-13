@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { useSigedaAuth } from "./auth-context";
+import { InsigniaRespaldo } from "./insignia-respaldo";
 import { perfilDisplay } from "./types";
 
 /**
@@ -55,9 +56,16 @@ export function BarraSesion() {
         >
           Mi cuenta
         </Link>
+        <Link
+          href="/sigeda/respaldos"
+          className="text-[var(--color-primary)] underline"
+        >
+          Respaldos
+        </Link>
       </div>
 
       <div className="flex flex-wrap items-center gap-4">
+        <InsigniaRespaldo />
         <span className="text-sm text-[var(--color-text-muted)]">
           Se cierra tras 15 min sin uso
         </span>
