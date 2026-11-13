@@ -16,6 +16,7 @@ from django.db.models import Q
 from django.db.models.functions import Lower
 from django.utils import timezone
 from rest_framework import status
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -27,11 +28,18 @@ from apps.documents.serializers import DocumentoExpedienteSerializer
 
 from . import controlador_busqueda
 from .controlador_busqueda import _SoloAlfanumerico
+from .controlador_importacion import (
+    ArchivoImportacionError,
+    generar_vista_previa,
+    importar_lote,
+)
 from .controlador_personas import (
     PersonaExistenteError,
     ValidacionPersonaError,
+    buscar_persona_existente,
     paja_titular_vigente,
     resolver_o_crear_persona,
+    validar_longitud_identificacion,
 )
 from .models import (
     Abonado,
@@ -40,6 +48,7 @@ from .models import (
     RolVinculo,
     Sector,
     TipoAbonado,
+    TipoIdentificacion,
     VinculoAbonado,
 )
 from .serializers import AbonadoSerializer, VinculoAbonadoSerializer
@@ -558,8 +567,19 @@ class AltaAbonadoView(APIView):
 
 
 class ModificarAbonadoView(APIView):
-    """RF-21 Modificar abonado (PAN-06): sector y tipo. La paja y el
-    estado no se tocan acá (el estado lo maneja D-03)."""
+    """
+    RF-21 Modificar abonado (PAN-06): sector y tipo. La paja y el
+    estado no se tocan acá (el estado lo maneja D-03).
+
+    RF-04/banner de "importado, pendiente": si el titular vigente de
+    este abonado todavía NO tiene identificación (el caso de un
+    abonado creado por la importación de SADA), esta misma pantalla
+    puede completársela con `tipo_identificacion_titular` +
+    `identificacion_titular` (decisión del 13/11/2026, ficha PAN-06
+    "importado"). Si el titular YA tenía identificación, estos dos
+    campos se ignoran sin error: ese no es el flujo para cambiarle la
+    identificación a alguien que ya la tenía.
+    """
 
     authentication_classes = [AutenticacionCuenta]
     permission_classes = [CuentaAutenticadaPermission]
@@ -603,6 +623,24 @@ class ModificarAbonadoView(APIView):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
+        tipo_identificacion_titular = (
+            request.data.get("tipo_identificacion_titular") or ""
+        ).strip() or None
+        identificacion_titular = (
+            request.data.get("identificacion_titular") or ""
+        ).strip() or None
+
+        if bool(tipo_identificacion_titular) != bool(identificacion_titular):
+            return Response(
+                {
+                    "detail": (
+                        "El tipo y el número de identificación del titular "
+                        "se deben completar juntos."
+                    ),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         cambios = {}
 
         if abonado.sector_id != (sector.id_sector if sector else None):
@@ -613,19 +651,89 @@ class ModificarAbonadoView(APIView):
         if abonado.tipo_abonado != tipo_abonado:
             cambios["abonado.tipo_abonado"] = (abonado.tipo_abonado, tipo_abonado)
 
-        with transaction.atomic():
-            abonado.sector = sector
-            abonado.tipo_abonado = tipo_abonado
-            abonado.save(update_fields=["sector", "tipo_abonado"])
+        try:
+            with transaction.atomic():
+                abonado.sector = sector
+                abonado.tipo_abonado = tipo_abonado
+                abonado.save(update_fields=["sector", "tipo_abonado"])
 
-            if cambios:
-                registro = registrar(
-                    cuenta=request.user,
-                    accion=AccionBitacora.MODIFICACION,
-                    elemento_afectado=f"abonado.id_abonado={abonado.id_abonado}",
-                    id_abonado=abonado.id_abonado,
-                )
-                registrar_modificaciones(registro, cambios)
+                if tipo_identificacion_titular is not None:
+                    vinculo_titular = (
+                        VinculoAbonado.objects
+                        .filter(
+                            abonado=abonado, rol=RolVinculo.TITULAR,
+                            fecha_fin__isnull=True,
+                        )
+                        .select_related("persona")
+                        .first()
+                    )
+
+                    # Solo se completa la identificación del titular
+                    # "pendiente" (todavía sin identificación, RF-04). Si
+                    # ya la tenía, se ignora: hoy no es el flujo para
+                    # cambiársela a alguien que ya la tenía.
+                    if (
+                        vinculo_titular is not None
+                        and vinculo_titular.persona.identificacion is None
+                    ):
+                        if (
+                            tipo_identificacion_titular
+                            not in TipoIdentificacion.values
+                        ):
+                            raise ValidacionPersonaError(
+                                "El tipo de identificación "
+                                f"«{tipo_identificacion_titular}» no es "
+                                "válido."
+                            )
+
+                        validar_longitud_identificacion(
+                            tipo_identificacion_titular, identificacion_titular,
+                        )
+
+                        existente = buscar_persona_existente(
+                            tipo_identificacion_titular, identificacion_titular,
+                        )
+
+                        if existente is not None:
+                            raise PersonaExistenteError(existente)
+
+                        persona = vinculo_titular.persona
+                        cambios["persona.tipo_identificacion"] = (
+                            persona.tipo_identificacion,
+                            tipo_identificacion_titular,
+                        )
+                        cambios["persona.identificacion"] = (
+                            persona.identificacion, identificacion_titular,
+                        )
+                        persona.tipo_identificacion = tipo_identificacion_titular
+                        persona.identificacion = identificacion_titular
+                        persona.save(
+                            update_fields=["tipo_identificacion", "identificacion"],
+                        )
+
+                if cambios:
+                    registro = registrar(
+                        cuenta=request.user,
+                        accion=AccionBitacora.MODIFICACION,
+                        elemento_afectado=f"abonado.id_abonado={abonado.id_abonado}",
+                        id_abonado=abonado.id_abonado,
+                    )
+                    registrar_modificaciones(registro, cambios)
+        except ValidacionPersonaError as error:
+            return Response(
+                {"detail": str(error)}, status=status.HTTP_400_BAD_REQUEST,
+            )
+        except PersonaExistenteError as error:
+            return Response(
+                {
+                    "persona_existente": {
+                        "id_persona": error.persona.id_persona,
+                        "nombre": error.persona.nombre,
+                        "numero_paja_titular": paja_titular_vigente(error.persona),
+                    },
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
 
         return Response(
             {
@@ -1158,5 +1266,110 @@ class CambiarTitularView(APIView):
                 "numero_paja": abonado.numero_paja,
                 "titular_vigente": persona_nueva.nombre,
                 "fecha_cambio": fecha_cambio,
+            },
+        )
+
+
+class VistaPreviaImportacionAbonadosView(APIView):
+    """
+    RF-04 Importar listado de SADA (PAN-09, paso 2 "revisar columnas"):
+    parsea el archivo y devuelve sus columnas + la fila de ejemplo (fila
+    2) + el total de filas, sin guardar nada.
+    """
+
+    authentication_classes = [AutenticacionCuenta]
+    permission_classes = [CuentaAutenticadaPermission]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request):
+        archivo = request.FILES.get("archivo")
+
+        if archivo is None:
+            return Response(
+                {"archivo": ["Debe elegir un archivo."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            resultado = generar_vista_previa(archivo)
+        except ArchivoImportacionError as error:
+            return Response(
+                {"archivo": [str(error)]}, status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return Response(
+            {
+                "columnas": resultado.columnas,
+                "ejemplo_fila_2": resultado.ejemplo_fila_2,
+                "total_filas": resultado.total_filas,
+            },
+        )
+
+
+class ImportarAbonadosView(APIView):
+    """
+    RF-04 Importar listado de SADA (PAN-09, paso 3 "importar"): manda
+    el archivo otra vez + el mapeo de columnas elegido; crea un abonado
+    por cada paja no registrada, en una sola transacción para todo el
+    archivo (ADR-04).
+    """
+
+    authentication_classes = [AutenticacionCuenta]
+    permission_classes = [CuentaAutenticadaPermission]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request):
+        archivo = request.FILES.get("archivo")
+
+        if archivo is None:
+            return Response(
+                {"archivo": ["Debe elegir un archivo."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        columna_paja = (request.data.get("columna_paja") or "").strip()
+        columna_nombre = (request.data.get("columna_nombre") or "").strip()
+
+        if not columna_paja:
+            return Response(
+                {"columna_paja": ["Elija la columna del número de paja."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not columna_nombre:
+            return Response(
+                {
+                    "columna_nombre": [
+                        "Elija la columna del nombre del titular.",
+                    ],
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            resultado = importar_lote(
+                archivo=archivo,
+                columna_paja=columna_paja,
+                columna_nombre=columna_nombre,
+                cuenta=request.user,
+            )
+        except ArchivoImportacionError as error:
+            return Response(
+                {"archivo": [str(error)]}, status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return Response(
+            {
+                "importados": resultado.importados,
+                "omitidos": resultado.omitidos,
+                "rechazados": [
+                    {
+                        "fila": fila.fila,
+                        "problema": fila.problema,
+                        "que_hacer": fila.que_hacer,
+                    }
+                    for fila in resultado.rechazados
+                ],
+                "fecha": resultado.fecha,
             },
         )

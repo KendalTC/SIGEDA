@@ -5,12 +5,16 @@ periodos superpuestos, cédula única, CHECK de abonado de baja, etc.).
 También RF-10 Buscar expedientes (consulta Q1), para PAN-03.
 """
 
+import csv
 import datetime
+import io
 
 from django.contrib.auth.hashers import make_password
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import IntegrityError, transaction
 from django.test import TestCase
 from django.urls import reverse
+from openpyxl import Workbook
 from rest_framework.test import APIClient
 
 from apps.accounts.models import Cuenta, TokenCuenta
@@ -19,7 +23,14 @@ from apps.configuration.models import TipoDocumento
 from apps.documents.models import Documento, VersionDocumento
 
 from . import controlador_busqueda as cb
+from .importacion.lectores import (
+    ArchivoImportacionError,
+    LectorArchivoExcel,
+    LectorArchivoTexto,
+    elegir_lector,
+)
 from .models import Abonado, Persona, RolVinculo, Sector, TipoAbonado, VinculoAbonado
+from .serializers import AbonadoSerializer
 from .servicio_completitud import calcular_completitud
 
 
@@ -1282,6 +1293,148 @@ class ModificarAbonadoViewTests(TestCase):
         self.assertEqual(respuesta.status_code, 404)
 
 
+class ModificarAbonadoCompletarIdentificacionTests(TestCase):
+    """
+    RF-04/RF-21: desde "Modificar abonado" (PAN-06) se completa la
+    identificación del titular de un abonado "importado, pendiente"
+    (decisión del 13/11/2026). La persona importada se actualiza en el
+    lugar, nunca se crea una nueva.
+    """
+
+    def setUp(self):
+        self.cliente = APIClient()
+        self.cuenta = _crear_cuenta_autenticada(
+            self.cliente, "secretaria_completar_identificacion",
+        )
+        self.abonado = Abonado.objects.create(
+            numero_paja="0990", tipo_abonado=TipoAbonado.PENDIENTE,
+        )
+        self.titular = Persona.objects.create(nombre="Persona Importada de SADA")
+        self.vinculo = VinculoAbonado.objects.create(
+            abonado=self.abonado,
+            persona=self.titular,
+            fecha_inicio=datetime.date(2026, 11, 13),
+            rol="TITULAR",
+        )
+
+    def test_completa_identificacion_del_titular_pendiente_con_exito(self):
+        respuesta = self.cliente.post(
+            reverse("abonados:modificar", args=["0990"]),
+            {
+                "tipo_abonado": "PERSONA_FISICA",
+                "tipo_identificacion_titular": "CEDULA_FISICA",
+                "identificacion_titular": "1-0000-0789",
+            },
+            format="json",
+        )
+        self.assertEqual(respuesta.status_code, 200, respuesta.data)
+
+        self.titular.refresh_from_db()
+        self.assertEqual(self.titular.tipo_identificacion, "CEDULA_FISICA")
+        self.assertEqual(self.titular.identificacion, "1-0000-0789")
+
+        # Es la misma persona (misma paja de titular, no se creó otra).
+        self.assertEqual(
+            VinculoAbonado.objects.filter(
+                abonado=self.abonado, rol="TITULAR", fecha_fin__isnull=True,
+            ).get().persona_id,
+            self.titular.id_persona,
+        )
+
+        registro = RegistroBitacora.objects.get(
+            accion=AccionBitacora.MODIFICACION,
+            elemento_afectado=f"abonado.id_abonado={self.abonado.id_abonado}",
+        )
+        campos = set(
+            RegistroModificacion.objects
+            .filter(registro_bitacora=registro)
+            .values_list("campo_modificado", flat=True)
+        )
+        self.assertIn("persona.tipo_identificacion", campos)
+        self.assertIn("persona.identificacion", campos)
+
+    def test_formato_invalido_responde_400_y_no_cambia_nada(self):
+        respuesta = self.cliente.post(
+            reverse("abonados:modificar", args=["0990"]),
+            {
+                "tipo_abonado": "PERSONA_FISICA",
+                "tipo_identificacion_titular": "CEDULA_FISICA",
+                "identificacion_titular": "1-0000-07",  # 7 dígitos, faltan 2
+            },
+            format="json",
+        )
+        self.assertEqual(respuesta.status_code, 400)
+        self.assertIn("9 dígitos", respuesta.data["detail"])
+
+        self.titular.refresh_from_db()
+        self.assertIsNone(self.titular.identificacion)
+        # Tampoco se guardó el cambio de tipo_abonado: todo o nada.
+        self.abonado.refresh_from_db()
+        self.assertEqual(self.abonado.tipo_abonado, TipoAbonado.PENDIENTE)
+
+    def test_identificacion_duplicada_responde_409_y_no_cambia_nada(self):
+        Persona.objects.create(
+            nombre="Otra Persona Ya Registrada",
+            tipo_identificacion="CEDULA_FISICA",
+            identificacion="1-0000-0654",
+        )
+
+        respuesta = self.cliente.post(
+            reverse("abonados:modificar", args=["0990"]),
+            {
+                "tipo_abonado": "PERSONA_FISICA",
+                "tipo_identificacion_titular": "CEDULA_FISICA",
+                "identificacion_titular": "100000654",  # misma cédula, sin guiones
+            },
+            format="json",
+        )
+        self.assertEqual(respuesta.status_code, 409)
+        self.assertEqual(
+            respuesta.data["persona_existente"]["nombre"],
+            "Otra Persona Ya Registrada",
+        )
+
+        self.titular.refresh_from_db()
+        self.assertIsNone(self.titular.identificacion)
+        self.abonado.refresh_from_db()
+        self.assertEqual(self.abonado.tipo_abonado, TipoAbonado.PENDIENTE)
+
+    def test_titular_con_identificacion_ya_completa_ignora_los_campos(self):
+        self.titular.tipo_identificacion = "CEDULA_FISICA"
+        self.titular.identificacion = "1-0000-0111"
+        self.titular.save(update_fields=["tipo_identificacion", "identificacion"])
+
+        respuesta = self.cliente.post(
+            reverse("abonados:modificar", args=["0990"]),
+            {
+                "tipo_abonado": "PERSONA_FISICA",
+                "tipo_identificacion_titular": "DIMEX",
+                "identificacion_titular": "123456789012",
+            },
+            format="json",
+        )
+        self.assertEqual(respuesta.status_code, 200, respuesta.data)
+
+        self.titular.refresh_from_db()
+        # No se tocó: ya tenía identificación, ese no es el flujo de hoy.
+        self.assertEqual(self.titular.tipo_identificacion, "CEDULA_FISICA")
+        self.assertEqual(self.titular.identificacion, "1-0000-0111")
+
+    def test_solo_un_campo_de_identificacion_responde_400(self):
+        respuesta = self.cliente.post(
+            reverse("abonados:modificar", args=["0990"]),
+            {
+                "tipo_abonado": "PERSONA_FISICA",
+                "tipo_identificacion_titular": "CEDULA_FISICA",
+            },
+            format="json",
+        )
+        self.assertEqual(respuesta.status_code, 400)
+
+        self.titular.refresh_from_db()
+        self.assertIsNone(self.titular.identificacion)
+
+
 class PersonaAsociadaViewsTests(TestCase):
     """1d: agregar/quitar/cambiar rol de persona asociada (D-06)."""
 
@@ -1716,3 +1869,429 @@ class CambiarTitularViewTests(TestCase):
         self.assertTrue(Documento.objects.filter(pk=documento.pk).exists())
         documento.refresh_from_db()
         self.assertEqual(documento.persona_id, self.titular_anterior.id_persona)
+
+
+def _excel_sada(filas: list[list[str]]) -> bytes:
+    """Arma un .xlsx real en memoria, como lo exportaría SADA."""
+
+    libro = Workbook()
+    hoja = libro.active
+
+    for fila in filas:
+        hoja.append(fila)
+
+    buffer = io.BytesIO()
+    libro.save(buffer)
+    return buffer.getvalue()
+
+
+def _csv_sada(filas: list[list[str]], *, separador: str = ",") -> bytes:
+    """Arma un .csv real en memoria, como lo exportaría SADA."""
+
+    buffer = io.StringIO()
+    escritor = csv.writer(buffer, delimiter=separador)
+
+    for fila in filas:
+        escritor.writerow(fila)
+
+    return buffer.getvalue().encode("utf-8")
+
+
+class LectoresImportacionTests(TestCase):
+    """1a: lectores de archivo (ADR-04)."""
+
+    FILAS = [
+        ["PAJA", "NOMBRE", "OTRO"],
+        ["0412", "Ana Lucía Mora Vega", "x"],
+        ["0413", "Esteban Mora Vega", "y"],
+    ]
+
+    def test_lector_excel_lee_columnas_y_filas(self):
+        archivo = SimpleUploadedFile(
+            "sada.xlsx",
+            _excel_sada(self.FILAS),
+            content_type=(
+                "application/vnd.openxmlformats-officedocument"
+                ".spreadsheetml.sheet"
+            ),
+        )
+
+        columnas, filas = LectorArchivoExcel().leer_filas(archivo)
+
+        self.assertEqual(columnas, ["PAJA", "NOMBRE", "OTRO"])
+        self.assertEqual(filas, [
+            ["0412", "Ana Lucía Mora Vega", "x"],
+            ["0413", "Esteban Mora Vega", "y"],
+        ])
+
+    def test_lector_excel_archivo_dañado_lanza_error_con_causa(self):
+        archivo = SimpleUploadedFile(
+            "sada.xlsx", b"esto no es un xlsx real",
+            content_type=(
+                "application/vnd.openxmlformats-officedocument"
+                ".spreadsheetml.sheet"
+            ),
+        )
+
+        with self.assertRaises(ArchivoImportacionError):
+            LectorArchivoExcel().leer_filas(archivo)
+
+    def test_lector_csv_con_coma_lee_columnas_y_filas(self):
+        archivo = SimpleUploadedFile(
+            "sada.csv", _csv_sada(self.FILAS, separador=","),
+            content_type="text/csv",
+        )
+
+        columnas, filas = LectorArchivoTexto().leer_filas(archivo)
+
+        self.assertEqual(columnas, ["PAJA", "NOMBRE", "OTRO"])
+        self.assertEqual(filas, [
+            ["0412", "Ana Lucía Mora Vega", "x"],
+            ["0413", "Esteban Mora Vega", "y"],
+        ])
+
+    def test_lector_csv_con_punto_y_coma_lee_columnas_y_filas(self):
+        archivo = SimpleUploadedFile(
+            "sada.csv", _csv_sada(self.FILAS, separador=";"),
+            content_type="text/csv",
+        )
+
+        columnas, filas = LectorArchivoTexto().leer_filas(archivo)
+
+        self.assertEqual(columnas, ["PAJA", "NOMBRE", "OTRO"])
+        self.assertEqual(len(filas), 2)
+
+    def test_elegir_lector_por_extension(self):
+        self.assertIsInstance(elegir_lector("sada.xlsx"), LectorArchivoExcel)
+        self.assertIsInstance(elegir_lector("sada.csv"), LectorArchivoTexto)
+
+    def test_elegir_lector_extension_invalida_lanza_error(self):
+        with self.assertRaises(ArchivoImportacionError):
+            elegir_lector("sada.jpg")
+
+
+class VistaPreviaImportacionViewTests(TestCase):
+    """1b: vista previa (PAN-09, paso 2), no guarda nada."""
+
+    def setUp(self):
+        self.cliente = APIClient()
+        self.cuenta = _crear_cuenta_autenticada(self.cliente, "secretaria_vista_previa")
+
+    def test_requiere_autenticacion(self):
+        cliente_anonimo = APIClient()
+        respuesta = cliente_anonimo.post(
+            reverse("abonados:importar_vista_previa"), {}, format="multipart",
+        )
+        self.assertEqual(respuesta.status_code, 403)
+
+    def test_devuelve_columnas_ejemplo_y_total(self):
+        archivo = SimpleUploadedFile(
+            "sada.xlsx",
+            _excel_sada([
+                ["PAJA", "NOMBRE"],
+                ["0940", "Ana Lucía Mora Vega"],
+                ["0941", "Esteban Mora Vega"],
+            ]),
+            content_type=(
+                "application/vnd.openxmlformats-officedocument"
+                ".spreadsheetml.sheet"
+            ),
+        )
+
+        total_abonados_antes = Abonado.objects.count()
+
+        respuesta = self.cliente.post(
+            reverse("abonados:importar_vista_previa"),
+            {"archivo": archivo},
+            format="multipart",
+        )
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertEqual(respuesta.data["columnas"], ["PAJA", "NOMBRE"])
+        self.assertEqual(
+            respuesta.data["ejemplo_fila_2"], ["0940", "Ana Lucía Mora Vega"],
+        )
+        self.assertEqual(respuesta.data["total_filas"], 2)
+        # No guarda nada (paso 2 "revisar columnas"):
+        self.assertEqual(Abonado.objects.count(), total_abonados_antes)
+
+    def test_sin_archivo_responde_400(self):
+        respuesta = self.cliente.post(
+            reverse("abonados:importar_vista_previa"), {}, format="multipart",
+        )
+        self.assertEqual(respuesta.status_code, 400)
+
+    def test_extension_invalida_responde_400_con_causa(self):
+        archivo = SimpleUploadedFile(
+            "sada.jpg", b"contenido cualquiera", content_type="image/jpeg",
+        )
+
+        respuesta = self.cliente.post(
+            reverse("abonados:importar_vista_previa"),
+            {"archivo": archivo},
+            format="multipart",
+        )
+
+        self.assertEqual(respuesta.status_code, 400)
+        self.assertIn(".xlsx", respuesta.data["archivo"][0])
+
+
+class ImportarAbonadosViewTests(TestCase):
+    """1c: importar de verdad (RF-04), una transacción para todo el lote."""
+
+    def setUp(self):
+        self.cliente = APIClient()
+        self.cuenta = _crear_cuenta_autenticada(self.cliente, "secretaria_importar")
+        # Paja ya registrada, para probar que se omite.
+        self.abonado_existente = Abonado.objects.create(
+            numero_paja="0412", tipo_abonado=TipoAbonado.PERSONA_FISICA,
+        )
+        titular_existente = Persona.objects.create(
+            nombre="Rodrigo Mora Castro",
+            tipo_identificacion="CEDULA_FISICA",
+            identificacion="1-0000-0001",
+        )
+        VinculoAbonado.objects.create(
+            abonado=self.abonado_existente,
+            persona=titular_existente,
+            fecha_inicio=datetime.date(2020, 1, 1),
+            rol="TITULAR",
+        )
+
+    def _archivo(self, filas):
+        return SimpleUploadedFile(
+            "sada.xlsx",
+            _excel_sada(filas),
+            content_type=(
+                "application/vnd.openxmlformats-officedocument"
+                ".spreadsheetml.sheet"
+            ),
+        )
+
+    def test_requiere_autenticacion(self):
+        cliente_anonimo = APIClient()
+        respuesta = cliente_anonimo.post(
+            reverse("abonados:importar"), {}, format="multipart",
+        )
+        self.assertEqual(respuesta.status_code, 403)
+
+    def test_importa_filas_validas_omite_duplicadas_y_rechaza_malas(self):
+        filas = [
+            ["PAJA", "NOMBRE"],
+            ["0950", "Ana Lucía Mora Vega"],   # nueva: se importa
+            ["0412", "Otro Nombre Cualquiera"],  # ya registrada: se omite
+            ["", "Sin Paja"],                   # paja vacía: se rechaza
+            ["04 88", "Con Espacios"],           # paja con espacios: se rechaza
+            ["04X8", "No Numerica"],             # paja no numérica: se rechaza
+        ]
+
+        respuesta = self.cliente.post(
+            reverse("abonados:importar"),
+            {
+                "archivo": self._archivo(filas),
+                "columna_paja": "PAJA",
+                "columna_nombre": "NOMBRE",
+            },
+            format="multipart",
+        )
+
+        self.assertEqual(respuesta.status_code, 200, respuesta.data)
+        self.assertEqual(respuesta.data["importados"], 1)
+        self.assertEqual(respuesta.data["omitidos"], 1)
+        self.assertEqual(len(respuesta.data["rechazados"]), 3)
+
+        rechazados_por_fila = {
+            r["fila"]: r for r in respuesta.data["rechazados"]
+        }
+        self.assertIn("No tiene número de paja", rechazados_por_fila[4]["problema"])
+        self.assertIn("espacios", rechazados_por_fila[5]["problema"])
+        self.assertIn(
+            "no son solo números", rechazados_por_fila[6]["problema"],
+        )
+
+        abonado_nuevo = Abonado.objects.get(numero_paja="0950")
+        self.assertEqual(abonado_nuevo.tipo_abonado, TipoAbonado.PENDIENTE)
+
+        vinculo = VinculoAbonado.objects.get(
+            abonado=abonado_nuevo, rol="TITULAR", fecha_fin__isnull=True,
+        )
+        self.assertEqual(vinculo.persona.nombre, "Ana Lucía Mora Vega")
+        self.assertIsNone(vinculo.persona.tipo_identificacion)
+        self.assertIsNone(vinculo.persona.identificacion)
+        self.assertEqual(vinculo.fecha_inicio, datetime.date.today())
+
+        # La paja duplicada no creó una segunda persona ni un segundo abonado.
+        self.assertFalse(
+            Persona.objects.filter(nombre="Otro Nombre Cualquiera").exists(),
+        )
+
+        # No se le quitaron los espacios automáticamente (RN-01, decisión
+        # del plan): no existe un abonado "0488".
+        self.assertFalse(Abonado.objects.filter(numero_paja="0488").exists())
+
+    def test_una_sola_fila_bitacora_por_archivo_no_una_por_fila(self):
+        filas = [
+            ["PAJA", "NOMBRE"],
+            ["0960", "Persona Uno"],
+            ["0961", "Persona Dos"],
+            ["0962", "Persona Tres"],
+        ]
+
+        self.cliente.post(
+            reverse("abonados:importar"),
+            {
+                "archivo": self._archivo(filas),
+                "columna_paja": "PAJA",
+                "columna_nombre": "NOMBRE",
+            },
+            format="multipart",
+        )
+
+        registros = RegistroBitacora.objects.filter(accion=AccionBitacora.IMPORTACION)
+        self.assertEqual(registros.count(), 1)
+
+        registro = registros.first()
+        self.assertEqual(registro.cuenta, self.cuenta)
+        self.assertTrue(
+            registro.elemento_afectado.startswith("importacion_sada.nombre_archivo="),
+        )
+
+        modificaciones = RegistroModificacion.objects.filter(
+            registro_bitacora=registro,
+        )
+        self.assertEqual(modificaciones.count(), 1)
+        self.assertIn("3 importados", modificaciones.first().valor_nuevo)
+
+    def test_archivo_sin_filas_de_datos_no_crea_evento_de_bitacora(self):
+        """Solo encabezado, sin ninguna fila de datos: nada que resumir."""
+
+        filas = [["PAJA", "NOMBRE"]]
+
+        respuesta = self.cliente.post(
+            reverse("abonados:importar"),
+            {
+                "archivo": self._archivo(filas),
+                "columna_paja": "PAJA",
+                "columna_nombre": "NOMBRE",
+            },
+            format="multipart",
+        )
+
+        self.assertEqual(respuesta.status_code, 200, respuesta.data)
+        self.assertEqual(respuesta.data["importados"], 0)
+        self.assertEqual(respuesta.data["omitidos"], 0)
+        self.assertEqual(respuesta.data["rechazados"], [])
+        self.assertFalse(
+            RegistroBitacora.objects.filter(
+                accion=AccionBitacora.IMPORTACION,
+            ).exists(),
+        )
+
+    def test_paja_omitida_por_duplicada_tambien_deja_bitacora(self):
+        """Aunque todo el lote se omita, sigue siendo un intento real de
+        importación: queda un evento con el resumen (0 importados)."""
+
+        filas = [["PAJA", "NOMBRE"], ["0412", "Ya Existe"]]
+
+        self.cliente.post(
+            reverse("abonados:importar"),
+            {
+                "archivo": self._archivo(filas),
+                "columna_paja": "PAJA",
+                "columna_nombre": "NOMBRE",
+            },
+            format="multipart",
+        )
+
+        registro = RegistroBitacora.objects.get(accion=AccionBitacora.IMPORTACION)
+        modificacion = RegistroModificacion.objects.get(registro_bitacora=registro)
+        self.assertIn("0 importados", modificacion.valor_nuevo)
+        self.assertIn("1 omitidos", modificacion.valor_nuevo)
+
+    def test_columna_elegida_inexistente_responde_400(self):
+        respuesta = self.cliente.post(
+            reverse("abonados:importar"),
+            {
+                "archivo": self._archivo([["PAJA", "NOMBRE"], ["0970", "Alguien"]]),
+                "columna_paja": "NO_EXISTE",
+                "columna_nombre": "NOMBRE",
+            },
+            format="multipart",
+        )
+        self.assertEqual(respuesta.status_code, 400)
+
+    def test_sin_mapeo_de_columnas_responde_400(self):
+        respuesta = self.cliente.post(
+            reverse("abonados:importar"),
+            {"archivo": self._archivo([["PAJA", "NOMBRE"]])},
+            format="multipart",
+        )
+        self.assertEqual(respuesta.status_code, 400)
+
+
+class AbonadoSerializerImportacionTests(TestCase):
+    """1d: banner de "abonado importado, pendiente" en PAN-06 modificar."""
+
+    def test_abonado_importado_sin_identificacion_es_pendiente(self):
+        abonado = Abonado.objects.create(
+            numero_paja="0980", tipo_abonado=TipoAbonado.PENDIENTE,
+        )
+        persona = Persona.objects.create(nombre="Persona Importada de SADA")
+        VinculoAbonado.objects.create(
+            abonado=abonado,
+            persona=persona,
+            fecha_inicio=datetime.date(2026, 11, 13),
+            rol="TITULAR",
+        )
+
+        datos = AbonadoSerializer(abonado).data
+
+        self.assertTrue(datos["es_importado_pendiente"])
+        self.assertEqual(
+            str(datos["fecha_importacion"]), "2026-11-13",
+        )
+
+    def test_abonado_normal_no_es_importado_pendiente(self):
+        abonado = Abonado.objects.create(
+            numero_paja="0981", tipo_abonado=TipoAbonado.PERSONA_FISICA,
+        )
+        persona = Persona.objects.create(
+            nombre="Ana Lucía Mora Vega",
+            tipo_identificacion="CEDULA_FISICA",
+            identificacion="1-0000-0123",
+        )
+        VinculoAbonado.objects.create(
+            abonado=abonado,
+            persona=persona,
+            fecha_inicio=datetime.date.today(),
+            rol="TITULAR",
+        )
+
+        datos = AbonadoSerializer(abonado).data
+
+        self.assertFalse(datos["es_importado_pendiente"])
+        self.assertIsNone(datos["fecha_importacion"])
+
+    def test_abonado_pendiente_con_identificacion_ya_completa_no_es_banner(self):
+        """RF-21 ya corrió: le completaron tipo e identificación al
+        titular, pero no le cambiaron tipo_abonado todavía."""
+
+        abonado = Abonado.objects.create(
+            numero_paja="0982", tipo_abonado=TipoAbonado.PENDIENTE,
+        )
+        persona = Persona.objects.create(
+            nombre="Persona Ya Completada",
+            tipo_identificacion="CEDULA_FISICA",
+            identificacion="1-0000-0456",
+        )
+        VinculoAbonado.objects.create(
+            abonado=abonado,
+            persona=persona,
+            fecha_inicio=datetime.date.today(),
+            rol="TITULAR",
+        )
+
+        datos = AbonadoSerializer(abonado).data
+
+        self.assertFalse(datos["es_importado_pendiente"])
+        self.assertIsNone(datos["fecha_importacion"])

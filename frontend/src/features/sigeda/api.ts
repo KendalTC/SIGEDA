@@ -29,8 +29,10 @@ import type {
   Respaldo,
   RespuestaBusqueda,
   RespuestaRespaldos,
+  ResultadoImportacion,
   SectorCatalogo,
   TipoDocumentoCatalogo,
+  VistaPreviaImportacion,
 } from "./types";
 import { borrarSesionLocal } from "./sesion-storage";
 
@@ -559,6 +561,41 @@ export function registrarPruebaRestauracion(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(datos),
     },
+  );
+}
+
+// --- RF-04 Importar listado de SADA (PAN-09) ------------------------
+
+/** Paso 2 "Revisar columnas": parsea el archivo (ADR-04) y devuelve sus
+ * columnas reales más un ejemplo de la fila 2, sin guardar nada
+ * todavía. 400 si la extensión no es .xlsx/.csv. */
+export function vistaPreviaImportacionSada(token: string, archivo: File) {
+  const formData = new FormData();
+  formData.append("archivo", archivo);
+
+  return sigedaFetch<VistaPreviaImportacion>(
+    "/api/sigeda/abonados/importar/vista-previa/",
+    { method: "POST", token, body: formData },
+  );
+}
+
+/** Paso 3 "Importar": manda el archivo otra vez (decisión de hoy: más
+ * simple que guardarlo temporalmente en el servidor entre pasos) junto
+ * con el mapeo de columnas elegido en el paso 2. */
+export function importarSada(
+  token: string,
+  archivo: File,
+  columnaPaja: string,
+  columnaNombre: string,
+) {
+  const formData = new FormData();
+  formData.append("archivo", archivo);
+  formData.set("columna_paja", columnaPaja);
+  formData.set("columna_nombre", columnaNombre);
+
+  return sigedaFetch<ResultadoImportacion>(
+    "/api/sigeda/abonados/importar/",
+    { method: "POST", token, body: formData },
   );
 }
 

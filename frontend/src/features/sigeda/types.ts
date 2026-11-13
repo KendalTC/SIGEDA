@@ -54,6 +54,13 @@ export type Abonado = {
   fecha_baja: string | null;
   titular_vigente: Persona | null;
   completitud: Completitud;
+  /** RF-04/RF-21 (ficha PAN-06, estado "importado"): abonado creado por
+   * importación de SADA al que todavía le falta tipo, sector e
+   * identificación del titular. Opcional en el tipo mientras el backend
+   * de la importación se termina de construir en paralelo (Incremento
+   * 3b, 13/11/2026). */
+  es_importado_pendiente?: boolean;
+  fecha_importacion?: string | null;
 };
 
 /** RF-03/RN-12: titulares anteriores (vínculo TITULAR cerrado). No
@@ -222,6 +229,13 @@ export type AltaAbonadoDatos = {
 export type ModificarAbonadoDatos = {
   id_sector: number;
   tipo_abonado: "PERSONA_FISICA" | "PERSONA_JURIDICA";
+  /** Solo cuando el titular vigente todavía no tiene identificación
+   * (abonado importado de SADA, ficha PAN-06 "importado"): el backend
+   * la completa en la misma transacción que sector/tipo ("todo o
+   * nada"); si el titular ya tenía identificación, los ignora sin
+   * error. Ambos juntos o ninguno. */
+  tipo_identificacion_titular?: TipoIdentificacion;
+  identificacion_titular?: string;
 };
 
 export type RolAsociado = "COTITULAR" | "APODERADA";
@@ -320,3 +334,34 @@ export type DatosRestaurar = {
   contrasena_administracion: string;
   confirmacion: string;
 };
+
+// --- RF-04 Importar listado de SADA (PAN-09) -------------------------
+
+/** `POST /api/sigeda/abonados/importar/vista-previa/`: paso "Revisar
+ * columnas", solo lee el archivo, no guarda nada todavía. */
+export type VistaPreviaImportacion = {
+  columnas: string[];
+  /** `null` cuando el archivo no tiene filas de datos. */
+  ejemplo_fila_2: string[] | null;
+  total_filas: number;
+};
+
+export type RechazoImportacion = {
+  fila: number;
+  problema: string;
+  que_hacer: string;
+};
+
+/** `POST /api/sigeda/abonados/importar/`: paso "Importar" de verdad. */
+export type ResultadoImportacion = {
+  importados: number;
+  omitidos: number;
+  rechazados: RechazoImportacion[];
+  fecha: string;
+};
+
+/** Qué representa cada columna real del archivo en la tabla de mapeo
+ * de la ficha (PAN-09, paso 2): el nombre de columna que la usuaria
+ * elija para "Número de paja" y para "Nombre del titular" es lo que se
+ * manda como `columna_paja`/`columna_nombre`; el resto son "No se usa". */
+export type UsoColumnaImportacion = "PAJA" | "NOMBRE" | "NO_USA";

@@ -9,9 +9,11 @@ from .views import (
     CambiarTitularView,
     DarDeBajaAbonadoView,
     ExpedienteView,
+    ImportarAbonadosView,
     ModificarAbonadoView,
     QuitarPersonaAsociadaView,
     ReactivarAbonadoView,
+    VistaPreviaImportacionAbonadosView,
 )
 
 app_name = "abonados"
@@ -20,6 +22,12 @@ urlpatterns = [
     path("buscar/", BuscarAbonadosView.as_view(), name="buscar"),
     path("alta/", AltaAbonadoView.as_view(), name="alta"),
     path("personas/buscar/", BuscarPersonasView.as_view(), name="buscar_personas"),
+    path(
+        "importar/vista-previa/",
+        VistaPreviaImportacionAbonadosView.as_view(),
+        name="importar_vista_previa",
+    ),
+    path("importar/", ImportarAbonadosView.as_view(), name="importar"),
     path(
         "<str:numero_paja>/expediente/",
         ExpedienteView.as_view(),

@@ -62,6 +62,12 @@ export function BarraSesion() {
         >
           Respaldos
         </Link>
+        <Link
+          href="/sigeda/abonados/importar"
+          className="text-[var(--color-primary)] underline"
+        >
+          Importar SADA
+        </Link>
       </div>
 
       <div className="flex flex-wrap items-center gap-4">

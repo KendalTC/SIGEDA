@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { ApiError } from "@/lib/api/errors";
 import {
+  esPersonaExistente,
   listarSectores,
   modificarAbonado,
   obtenerExpediente,
@@ -24,10 +25,16 @@ import {
   DialogoCambiarTitular,
   type DialogoCambiarTitularHandle,
 } from "@/features/sigeda/dialogo-cambiar-titular";
+import {
+  AYUDA_FORMATOS_IDENTIFICACION,
+  OPCIONES_TIPO_IDENTIFICACION,
+} from "@/features/sigeda/identificacion";
 import type {
   Expediente,
+  PersonaExistenteConflicto,
   RolAsociado,
   SectorCatalogo,
+  TipoIdentificacion,
 } from "@/features/sigeda/types";
 
 type TipoAbonado = "PERSONA_FISICA" | "PERSONA_JURIDICA";
@@ -48,10 +55,26 @@ export default function ModificarAbonadoPage() {
   const [errorCarga, setErrorCarga] = useState<string | null>(null);
 
   const [idSector, setIdSector] = useState("");
-  const [tipoAbonado, setTipoAbonado] = useState<TipoAbonado>("PERSONA_FISICA");
+  // RF-04/RF-21 (ficha PAN-06 "importado"): un abonado recién importado
+  // de SADA no trae tipo, así que el radio arranca sin marcar — "" es
+  // "todavía sin elegir", nunca un tercer tipo de abonado real.
+  const [tipoAbonado, setTipoAbonado] = useState<TipoAbonado | "">(
+    "PERSONA_FISICA",
+  );
+  // RF-04 (ficha PAN-06 "importado"): completa la identificación del
+  // titular cuando todavía no la tiene (abonado creado por importación
+  // de SADA). Ambos campos son opcionales, pero van juntos o ninguno.
+  const [tipoIdentificacionTitular, setTipoIdentificacionTitular] = useState<
+    TipoIdentificacion | ""
+  >("");
+  const [identificacionTitular, setIdentificacionTitular] = useState("");
 
   const [guardando, setGuardando] = useState(false);
   const [errorSector, setErrorSector] = useState<string | null>(null);
+  const [errorIdentificacionTitular, setErrorIdentificacionTitular] =
+    useState<string | null>(null);
+  const [conflictoIdentificacionTitular, setConflictoIdentificacionTitular] =
+    useState<PersonaExistenteConflicto | null>(null);
   const [errorGeneral, setErrorGeneral] = useState<string | null>(null);
   const [mensaje, setMensaje] = useState<string | null>(null);
   const [erroresPersona, setErroresPersona] = useState<Record<number, string>>(
@@ -77,11 +100,17 @@ export default function ModificarAbonadoPage() {
         (s) => s.nombre === datosExpediente.abonado.sector,
       );
       setIdSector(sectorActual ? String(sectorActual.id_sector) : "");
+
+      const { tipo_abonado: tipoAbonadoActual } = datosExpediente.abonado;
       setTipoAbonado(
-        datosExpediente.abonado.tipo_abonado === "PERSONA_JURIDICA"
-          ? "PERSONA_JURIDICA"
-          : "PERSONA_FISICA",
+        tipoAbonadoActual === "PENDIENTE"
+          ? ""
+          : tipoAbonadoActual === "PERSONA_JURIDICA"
+            ? "PERSONA_JURIDICA"
+            : "PERSONA_FISICA",
       );
+      setTipoIdentificacionTitular("");
+      setIdentificacionTitular("");
     } catch (err) {
       setErrorCarga(
         err instanceof Error ? err.message : "No fue posible cargar el abonado.",
@@ -103,24 +132,78 @@ export default function ModificarAbonadoPage() {
   }, [cargandoSesion, sesion, router, cargar]);
 
   async function guardar() {
-    if (!sesion) return;
+    if (!sesion || !expediente) return;
 
-    setGuardando(true);
+    // Condición exacta que usa el backend para decidir si procesa
+    // `tipo_identificacion_titular`/`identificacion_titular` (más
+    // precisa que `es_importado_pendiente`, que además exige que el
+    // tipo de abonado siga en PENDIENTE).
+    const titularSinIdentificacion =
+      expediente.abonado.titular_vigente !== null &&
+      expediente.abonado.titular_vigente.identificacion === null;
+
     setErrorSector(null);
+    setErrorIdentificacionTitular(null);
+    setConflictoIdentificacionTitular(null);
     setErrorGeneral(null);
     setMensaje(null);
+
+    if (tipoAbonado === "") {
+      setErrorGeneral("Elija el tipo de abonado antes de guardar.");
+      return;
+    }
+
+    const tipoIdVacio = tipoIdentificacionTitular === "";
+    const numeroIdVacio = identificacionTitular.trim() === "";
+
+    if (titularSinIdentificacion && tipoIdVacio !== numeroIdVacio) {
+      setErrorIdentificacionTitular(
+        "El tipo y el número de identificación del titular se deben completar juntos.",
+      );
+      return;
+    }
+
+    setGuardando(true);
 
     try {
       await modificarAbonado(sesion.token, numeroPaja, {
         id_sector: Number(idSector),
         tipo_abonado: tipoAbonado,
+        ...(titularSinIdentificacion && !tipoIdVacio && !numeroIdVacio
+          ? {
+              tipo_identificacion_titular:
+                tipoIdentificacionTitular as TipoIdentificacion,
+              identificacion_titular: identificacionTitular.trim(),
+            }
+          : {}),
       });
 
       setMensaje("Cambios guardados.");
       await cargar();
     } catch (err) {
+      if (
+        err instanceof ApiError &&
+        err.status === 409 &&
+        esPersonaExistente(err.payload)
+      ) {
+        setConflictoIdentificacionTitular(err.payload.persona_existente);
+        return;
+      }
+
       if (err instanceof ApiError && err.status === 400) {
         setErrorSector(err.fieldErrors.id_sector?.[0] ?? null);
+
+        // Los errores de identificación del titular vienen en "detail"
+        // (sin clave de campo propia): si no hay error de sector, es la
+        // explicación más probable mientras el mini-formulario esté
+        // visible. Este mensaje en particular ya trae su propio "⚠ "
+        // puesto por el backend (a diferencia del resto); se quita acá
+        // para no duplicar el ícono, igual que ya se hace con
+        // numero_paja en el alta (RF-02).
+        if (!err.fieldErrors.id_sector && titularSinIdentificacion) {
+          setErrorIdentificacionTitular(err.message.replace(/^⚠\s*/, ""));
+        }
+
         setErrorGeneral(err.message);
         return;
       }
@@ -189,6 +272,13 @@ export default function ModificarAbonadoPage() {
   const vinculoTitular = personasVigentes.find((v) => v.rol === "TITULAR");
   const personasAsociadas = personasVigentes.filter((v) => v.rol !== "TITULAR");
   const esActivo = abonado.estado === "ACTIVO";
+  // Misma condición que usa `ModificarAbonadoView` en el backend para
+  // decidir si completa la identificación del titular: no depende de
+  // `es_importado_pendiente` (que exige además tipo_abonado PENDIENTE),
+  // para que el mini-formulario siga disponible aunque ya se haya
+  // elegido el tipo de abonado en un guardado anterior.
+  const titularSinIdentificacion =
+    abonado.titular_vigente !== null && abonado.titular_vigente.identificacion === null;
 
   return (
     <main className="mx-auto flex max-w-4xl flex-col gap-6 p-6">
@@ -204,6 +294,24 @@ export default function ModificarAbonadoPage() {
       </nav>
 
       <h1>Modificar abonado y personas</h1>
+
+      {abonado.es_importado_pendiente ? (
+        <div
+          role="status"
+          className="rounded-[var(--radius-md)] border border-[var(--color-warning)] bg-[var(--color-warning-soft)] px-4 py-3 text-[var(--color-warning)]"
+        >
+          <p className="font-semibold">
+            Abonado importado de SADA el{" "}
+            {formatearFecha(abonado.fecha_importacion ?? vinculoTitular?.fecha_inicio ?? "")}
+            : faltan el tipo de abonado, el sector y la identificación del
+            titular.
+          </p>
+          <p>
+            Mientras el tipo esté pendiente, el panel de completitud lo
+            muestra aparte. Complete los datos y guarde.
+          </p>
+        </div>
+      ) : null}
 
       {mensaje ? (
         <div
@@ -284,9 +392,16 @@ export default function ModificarAbonadoPage() {
                 Persona jurídica
               </label>
             </div>
-            <p className="text-sm text-[var(--color-text-muted)]">
-              Define qué documentos son obligatorios.
-            </p>
+            {tipoAbonado === "" ? (
+              <p className="text-sm font-semibold text-[var(--color-danger)]">
+                ⚠ Tipo pendiente: elija uno para que se pueda calcular la
+                completitud.
+              </p>
+            ) : (
+              <p className="text-sm text-[var(--color-text-muted)]">
+                Define qué documentos son obligatorios.
+              </p>
+            )}
           </div>
         </div>
       </fieldset>
@@ -312,11 +427,87 @@ export default function ModificarAbonadoPage() {
           <strong>{abonado.titular_vigente?.nombre ?? "Sin titular"}</strong>
           {abonado.titular_vigente?.identificacion
             ? ` · ${abonado.titular_vigente.identificacion}`
-            : ""}
+            : titularSinIdentificacion
+              ? " · sin identificación"
+              : ""}
           {vinculoTitular
             ? ` · titular desde ${formatearFecha(vinculoTitular.fecha_inicio)}`
             : ""}
         </p>
+
+        {titularSinIdentificacion ? (
+          <div className="mt-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-3">
+            <p className="font-medium">Completar identificación del titular</p>
+
+            {conflictoIdentificacionTitular ? (
+              <div className="mt-2 rounded-[var(--radius-md)] border border-[var(--color-warning)] bg-[var(--color-warning-soft)] px-4 py-3 text-[var(--color-warning)]">
+                <p className="font-semibold">
+                  Ya existe una persona con esa identificación:{" "}
+                  {conflictoIdentificacionTitular.nombre}
+                  {conflictoIdentificacionTitular.numero_paja_titular
+                    ? `, titular de la paja ${conflictoIdentificacionTitular.numero_paja_titular}`
+                    : ""}
+                  .
+                </p>
+                <p>Revise el número.</p>
+              </div>
+            ) : null}
+
+            <div className="mt-2 grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="tipo-identificacion-titular">
+                  Tipo de identificación (opcional)
+                </label>
+                <Select
+                  id="tipo-identificacion-titular"
+                  value={tipoIdentificacionTitular}
+                  hasError={Boolean(errorIdentificacionTitular)}
+                  onChange={(e) => {
+                    setTipoIdentificacionTitular(
+                      e.target.value as TipoIdentificacion | "",
+                    );
+                    setErrorIdentificacionTitular(null);
+                    setConflictoIdentificacionTitular(null);
+                  }}
+                >
+                  <option value="">Sin identificación todavía</option>
+                  {OPCIONES_TIPO_IDENTIFICACION.map((opcion) => (
+                    <option key={opcion.valor} value={opcion.valor}>
+                      {opcion.etiqueta}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="identificacion-titular">
+                  Número de identificación (opcional)
+                </label>
+                <Input
+                  id="identificacion-titular"
+                  value={identificacionTitular}
+                  placeholder="1-0000-0000"
+                  hasError={Boolean(errorIdentificacionTitular)}
+                  onChange={(e) => {
+                    setIdentificacionTitular(e.target.value);
+                    setErrorIdentificacionTitular(null);
+                    setConflictoIdentificacionTitular(null);
+                  }}
+                />
+              </div>
+            </div>
+
+            {errorIdentificacionTitular ? (
+              <p className="mt-1 text-sm text-[var(--color-danger)]">
+                ⚠ {errorIdentificacionTitular}
+              </p>
+            ) : (
+              <p className="mt-1 text-sm text-[var(--color-text-muted)]">
+                {AYUDA_FORMATOS_IDENTIFICACION}
+              </p>
+            )}
+          </div>
+        ) : null}
 
         {historialTitulares.length > 0 ? (
           <details className="mt-3">
