@@ -199,7 +199,7 @@ export default function NuevoAbonadoPage() {
 
   if (estado === "exito") {
     return (
-      <main className="mx-auto max-w-3xl p-6">
+      <main className="mx-auto max-w-5xl p-8">
         <h1>Registrar abonado</h1>
         <div className="mt-4 rounded-[var(--radius-md)] border border-[var(--color-success)] bg-[var(--color-success-soft)] px-4 py-3 text-[var(--color-success)]">
           <p className="font-semibold">
@@ -233,7 +233,7 @@ export default function NuevoAbonadoPage() {
   }
 
   return (
-    <main className="mx-auto flex max-w-4xl flex-col gap-6 p-6">
+    <main className="mx-auto flex max-w-6xl flex-col gap-6 p-8">
       <nav aria-label="Ruta">
         <Link href="/sigeda/buscar" className="text-[var(--color-primary)]">
           Buscar expediente
@@ -303,7 +303,7 @@ export default function NuevoAbonadoPage() {
       ) : null}
 
       <form onSubmit={manejarEnvio} className="flex flex-col gap-6" noValidate>
-        <fieldset className="rounded-[var(--radius-md)] border border-[var(--color-border)] p-4">
+        <fieldset className="rounded-[var(--radius-lg)] border border-[var(--color-border)] shadow-[var(--shadow-sm)] p-6">
           <legend className="px-1 text-lg font-semibold">Datos del abonado</legend>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -379,7 +379,7 @@ export default function NuevoAbonadoPage() {
           </div>
         </fieldset>
 
-        <fieldset className="rounded-[var(--radius-md)] border border-[var(--color-border)] p-4">
+        <fieldset className="rounded-[var(--radius-lg)] border border-[var(--color-border)] shadow-[var(--shadow-sm)] p-6">
           <legend className="px-1 text-lg font-semibold">Titular vigente</legend>
 
           <div className="flex flex-col gap-4">
@@ -486,7 +486,7 @@ export default function NuevoAbonadoPage() {
           </div>
         </fieldset>
 
-        <fieldset className="rounded-[var(--radius-md)] border border-[var(--color-border)] p-4">
+        <fieldset className="rounded-[var(--radius-lg)] border border-[var(--color-border)] shadow-[var(--shadow-sm)] p-6">
           <legend className="px-1 text-lg font-semibold">
             Personas asociadas (cotitulares y persona apoderada)
           </legend>

@@ -127,7 +127,7 @@ export default function PruebaRestauracionPage() {
 
   if (guardada) {
     return (
-      <main className="mx-auto flex max-w-2xl flex-col gap-6 p-6">
+      <main className="mx-auto flex max-w-4xl flex-col gap-6 p-8">
         <h1>Prueba de restauración registrada</h1>
         <div
           role="status"
@@ -157,7 +157,7 @@ export default function PruebaRestauracionPage() {
   }
 
   return (
-    <main className="mx-auto flex max-w-2xl flex-col gap-6 p-6">
+    <main className="mx-auto flex max-w-4xl flex-col gap-6 p-8">
       <nav aria-label="Ruta">
         <Link href="/sigeda/respaldos" className="text-[var(--color-primary)]">
           Respaldos

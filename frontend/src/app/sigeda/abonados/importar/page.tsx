@@ -231,7 +231,7 @@ export default function ImportarSadaPage() {
   }
 
   return (
-    <main className="mx-auto flex max-w-4xl flex-col gap-6 p-6">
+    <main className="mx-auto flex max-w-6xl flex-col gap-6 p-8">
       <nav aria-label="Ruta">
         <Link href="/sigeda/buscar" className="text-[var(--color-primary)]">
           Buscar expediente
@@ -251,7 +251,7 @@ export default function ImportarSadaPage() {
       <Pasos paso={paso} />
 
       {paso === "elegir" ? (
-        <fieldset className="rounded-[var(--radius-md)] border border-[var(--color-border)] p-4">
+        <fieldset className="rounded-[var(--radius-lg)] border border-[var(--color-border)] shadow-[var(--shadow-sm)] p-6">
           <legend className="px-1 font-semibold">Archivo de SADA</legend>
 
           <label
@@ -309,7 +309,7 @@ export default function ImportarSadaPage() {
       ) : null}
 
       {paso === "revisar" && vistaPrevia ? (
-        <fieldset className="rounded-[var(--radius-md)] border border-[var(--color-border)] p-4">
+        <fieldset className="rounded-[var(--radius-lg)] border border-[var(--color-border)] shadow-[var(--shadow-sm)] p-6">
           <legend className="px-1 font-semibold">Columnas detectadas</legend>
 
           <p className="mb-3">
@@ -394,7 +394,7 @@ export default function ImportarSadaPage() {
         <div
           role="status"
           aria-live="polite"
-          className="flex items-center gap-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-6"
+          className="flex items-center gap-3 rounded-[var(--radius-lg)] border border-[var(--color-border)] shadow-[var(--shadow-sm)] bg-[var(--color-surface-muted)] p-6"
         >
           <span
             className="size-5 animate-spin rounded-full border-2 border-current border-r-transparent"
@@ -420,7 +420,7 @@ export default function ImportarSadaPage() {
           </div>
 
           <div className="grid gap-4 sm:grid-cols-3">
-            <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] border-l-4 border-l-[var(--color-success)] p-4">
+            <div className="rounded-[var(--radius-lg)] border border-[var(--color-border)] shadow-[var(--shadow-sm)] border-l-4 border-l-[var(--color-success)] p-6">
               <p className="text-3xl font-bold">
                 {formatearMiles(resultado.importados)}
               </p>
@@ -428,7 +428,7 @@ export default function ImportarSadaPage() {
                 Importados (tipo pendiente)
               </p>
             </div>
-            <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] border-l-4 border-l-[var(--color-border-strong)] p-4">
+            <div className="rounded-[var(--radius-lg)] border border-[var(--color-border)] shadow-[var(--shadow-sm)] border-l-4 border-l-[var(--color-border-strong)] p-6">
               <p className="text-3xl font-bold">
                 {formatearMiles(resultado.omitidos)}
               </p>
@@ -436,7 +436,7 @@ export default function ImportarSadaPage() {
                 Omitidos: la paja ya existía
               </p>
             </div>
-            <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] border-l-4 border-l-[var(--color-danger)] p-4">
+            <div className="rounded-[var(--radius-lg)] border border-[var(--color-border)] shadow-[var(--shadow-sm)] border-l-4 border-l-[var(--color-danger)] p-6">
               <p className="text-3xl font-bold">
                 {formatearMiles(resultado.rechazados.length)}
               </p>
@@ -482,7 +482,7 @@ export default function ImportarSadaPage() {
 
           <div
             role="status"
-            className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-4 py-3"
+            className="rounded-[var(--radius-lg)] border border-[var(--color-border)] shadow-[var(--shadow-sm)] bg-[var(--color-surface-muted)] px-4 py-3"
           >
             <p className="font-semibold">Los nombres repetidos no se unen solos.</p>
             <p>

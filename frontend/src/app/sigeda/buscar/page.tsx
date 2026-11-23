@@ -193,7 +193,7 @@ export default function BuscarExpedientePage() {
   }
 
   return (
-    <main className="mx-auto flex max-w-5xl flex-col gap-6 p-6">
+    <main className="mx-auto flex max-w-7xl flex-col gap-6 p-8">
       <h1>Buscar expediente</h1>
 
       <form onSubmit={manejarEnvio} className="flex flex-col gap-4" noValidate>

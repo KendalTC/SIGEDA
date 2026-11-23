@@ -176,7 +176,7 @@ export default function ExportarDocumentosPage() {
   }
 
   return (
-    <main className="mx-auto flex max-w-4xl flex-col gap-6 p-6">
+    <main className="mx-auto flex max-w-6xl flex-col gap-6 p-8">
       <nav aria-label="Ruta">
         <Link href="/sigeda/buscar" className="text-[var(--color-primary)]">
           Buscar expediente

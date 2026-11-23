@@ -230,7 +230,7 @@ export default function CargarDocumentoPage({
 
   if (estado === "exito" && resultado) {
     return (
-      <main className="mx-auto max-w-3xl p-6">
+      <main className="mx-auto max-w-5xl p-8">
         <h1>Cargar documento</h1>
         <div className="mt-4 rounded-[var(--radius-md)] border border-[var(--color-success)] bg-[var(--color-success-soft)] px-4 py-3 text-[var(--color-success)]">
           <p className="font-semibold">{resultado.detail}</p>
@@ -273,7 +273,7 @@ export default function CargarDocumentoPage({
   const hayErroresLocales = filas.some((fila) => fila.errorArchivo);
 
   return (
-    <main className="mx-auto flex max-w-5xl flex-col gap-6 p-6">
+    <main className="mx-auto flex max-w-7xl flex-col gap-6 p-8">
       <nav aria-label="Ruta">
         <button
           type="button"
@@ -303,7 +303,7 @@ export default function CargarDocumentoPage({
         </div>
       ) : null}
 
-      <fieldset className="rounded-[var(--radius-md)] border border-[var(--color-border)] p-4">
+      <fieldset className="rounded-[var(--radius-lg)] border border-[var(--color-border)] shadow-[var(--shadow-sm)] p-6">
         <legend className="px-1 font-semibold">1. ¿Qué va a cargar?</legend>
 
         <label className="flex items-center gap-2 py-1">
@@ -333,7 +333,7 @@ export default function CargarDocumentoPage({
             </label>
             <select
               id="documento-existente"
-              className="mt-1 h-12 w-full max-w-xl rounded-[var(--radius-md)] border border-[var(--color-border)] px-3"
+              className="mt-1 h-12 w-full max-w-xl rounded-[var(--radius-lg)] border border-[var(--color-border)] shadow-[var(--shadow-sm)] px-3"
               value={documentoSeleccionado?.id_documento ?? ""}
               onChange={(evento) => {
                 const documento = documentosVigentes.find(
@@ -366,7 +366,7 @@ export default function CargarDocumentoPage({
         ) : null}
       </fieldset>
 
-      <fieldset className="rounded-[var(--radius-md)] border border-[var(--color-border)] p-4">
+      <fieldset className="rounded-[var(--radius-lg)] border border-[var(--color-border)] shadow-[var(--shadow-sm)] p-6">
         <legend className="px-1 font-semibold">2. Archivos</legend>
 
         <label
@@ -402,7 +402,7 @@ export default function CargarDocumentoPage({
       {filas.length === 0 ? (
         <p>Todavía no ha elegido archivos.</p>
       ) : (
-        <fieldset className="rounded-[var(--radius-md)] border border-[var(--color-border)] p-4">
+        <fieldset className="rounded-[var(--radius-lg)] border border-[var(--color-border)] shadow-[var(--shadow-sm)] p-6">
           <legend className="px-1 font-semibold">3. Datos de cada archivo</legend>
           <p className="mb-3 text-sm text-[var(--color-text-muted)]">
             La fecha del documento se propone con la fecha de hoy. Si digitaliza un
@@ -419,7 +419,7 @@ export default function CargarDocumentoPage({
               return (
                 <div
                   key={fila.id}
-                  className="rounded-[var(--radius-md)] border border-[var(--color-border)] p-3"
+                  className="rounded-[var(--radius-lg)] border border-[var(--color-border)] shadow-[var(--shadow-sm)] p-5"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div>
@@ -453,7 +453,7 @@ export default function CargarDocumentoPage({
                         </label>
                         <select
                           id={`tipo-${fila.id}`}
-                          className="mt-1 h-11 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] px-2"
+                          className="mt-1 h-11 w-full rounded-[var(--radius-lg)] border border-[var(--color-border)] shadow-[var(--shadow-sm)] px-2"
                           value={fila.tipoDocumentoId}
                           onChange={(e) =>
                             actualizarFila(fila.id, {
@@ -490,7 +490,7 @@ export default function CargarDocumentoPage({
                       </label>
                       <select
                         id={`persona-${fila.id}`}
-                        className="mt-1 h-11 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] px-2"
+                        className="mt-1 h-11 w-full rounded-[var(--radius-lg)] border border-[var(--color-border)] shadow-[var(--shadow-sm)] px-2"
                         value={fila.personaId}
                         onChange={(e) =>
                           actualizarFila(fila.id, {

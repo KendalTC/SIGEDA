@@ -5,49 +5,22 @@ import { useEffect, useState } from "react";
 
 import { obtenerRespaldos } from "./api";
 import { useSigedaAuth } from "./auth-context";
+import { CLASE_ENLACE_NAV, CLASE_ICONO_NAV } from "./nav-estilos";
 import { calcularResumen, formatearFechaHora } from "./respaldos-estado";
 
-type Tono = "ok" | "warn" | "err";
-
-// El color de texto se aplica con `style` (no con una clase de Tailwind):
-// `app/globals.css` trae un reset "a { color: inherit }" sin capa
-// (@layer), y por las reglas de cascada de CSS, una regla sin capa le
-// gana a cualquier regla con capa (como las utilidades de Tailwind) sin
-// importar la especificidad — así que una clase de color de texto de
-// Tailwind puesta en un enlace nunca gana. Un estilo en línea sí.
-//
-// Ojo si editás este comentario: no escribas aquí un ejemplo con la
-// forma literal de una clase de Tailwind (corchetes + var(--...)) — el
-// escáner de Tailwind lee TODO el archivo como texto plano, comentarios
-// incluidos, y trató un ejemplo así como una clase real, generando CSS
-// inválido y tumbando toda la app con error 500 (hallado el 23/11/2026).
-const ESTILOS_TONO: Record<Tono, { clase: string; color: string }> = {
-  ok: {
-    clase: "border-[var(--color-success)] bg-[var(--color-success-soft)]",
-    color: "var(--color-success)",
-  },
-  warn: {
-    clase: "border-[var(--color-warning)] bg-[var(--color-warning-soft)]",
-    color: "var(--color-warning)",
-  },
-  err: {
-    clase: "border-[var(--color-danger)] bg-[var(--color-danger-soft)]",
-    color: "var(--color-danger)",
-  },
-};
-
 /**
- * Insignia global de respaldo (RF-16, ficha PAN-08): verde/ámbar/rojo
- * con texto en los tres casos (nunca solo color, guía de estilo de
- * SIGEDA), visible en cualquier pantalla autenticada; es un enlace a
- * PAN-08. Si la consulta falla (p. ej. mientras el backend de
- * respaldos todavía se está construyendo), no muestra nada en vez de
- * tumbar el resto de la barra con un error permanente.
+ * Insignia global de respaldo (RF-16, ficha PAN-08): visible en
+ * cualquier pantalla autenticada; es un enlace a PAN-08, con el mismo
+ * estilo que "Mi cuenta"/"Cerrar sesión" (decisión del 23/11/2026,
+ * pedido de Kendal — antes era una insignia verde/ámbar/roja, pero el
+ * texto ya dice la causa por sí solo: "Sin respaldos", "...falló",
+ * "...pendiente"). Si la consulta falla (p. ej. mientras el backend
+ * de respaldos todavía se está construyendo), no muestra nada en vez
+ * de tumbar el resto de la barra con un error permanente.
  */
 export function InsigniaRespaldo() {
   const { sesion } = useSigedaAuth();
   const [texto, setTexto] = useState<string | null>(null);
-  const [tono, setTono] = useState<Tono>("ok");
 
   useEffect(() => {
     if (!sesion) {
@@ -67,18 +40,14 @@ export function InsigniaRespaldo() {
         );
 
         if (estadoGlobal === "sin_respaldos") {
-          setTono("err");
           setTexto("Sin respaldos ✕");
           return;
         }
 
         if (estadoGlobal === "completo" && ultimoCompleto) {
-          setTono("ok");
           setTexto(`Último respaldo: ${formatearFechaHora(ultimoCompleto.fecha_hora)} ✓`);
           return;
         }
-
-        setTono("warn");
 
         if (estadoGlobal === "fallido") {
           setTexto(
@@ -111,14 +80,23 @@ export function InsigniaRespaldo() {
   }
 
   return (
-    <Link
-      href="/sigeda/respaldos"
-      className={[
-        "inline-flex items-center rounded-full border px-3 py-1 text-sm font-semibold",
-        ESTILOS_TONO[tono].clase,
-      ].join(" ")}
-      style={{ color: ESTILOS_TONO[tono].color }}
-    >
+    <Link href="/sigeda/respaldos" className={`${CLASE_ENLACE_NAV} px-3 py-2 text-[13.5px]`}>
+      <svg
+        width="17"
+        height="17"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+        className={CLASE_ICONO_NAV}
+      >
+        <ellipse cx="12" cy="5.5" rx="8" ry="2.6" />
+        <path d="M4 5.5v5.8c0 1.4 3.6 2.6 8 2.6s8-1.2 8-2.6V5.5" />
+        <path d="M4 11.3v5.8c0 1.4 3.6 2.6 8 2.6s8-1.2 8-2.6v-5.8" />
+      </svg>
       {texto}
     </Link>
   );

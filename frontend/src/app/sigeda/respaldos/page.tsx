@@ -135,7 +135,7 @@ export default function RespaldosPage() {
 
   if (error && !datos) {
     return (
-      <main className="mx-auto flex max-w-5xl flex-col gap-4 p-6">
+      <main className="mx-auto flex max-w-7xl flex-col gap-4 p-8">
         <h1>Respaldo y restauración</h1>
         <div
           role="alert"
@@ -166,7 +166,7 @@ export default function RespaldosPage() {
   // --- Estado "vacío": todavía no hay ningún respaldo -----------------
   if (estadoGlobal === "sin_respaldos") {
     return (
-      <main className="mx-auto flex max-w-3xl flex-col gap-6 p-6">
+      <main className="mx-auto flex max-w-5xl flex-col gap-6 p-8">
         <h1>Respaldo y restauración</h1>
 
         {mensajeAccion ? (
@@ -262,7 +262,7 @@ export default function RespaldosPage() {
   }
 
   return (
-    <main className="mx-auto flex max-w-5xl flex-col gap-6 p-6">
+    <main className="mx-auto flex max-w-7xl flex-col gap-6 p-8">
       <div className="flex flex-col gap-1">
         <h1>Respaldo y restauración</h1>
         <p>
@@ -294,7 +294,7 @@ export default function RespaldosPage() {
       <div className="grid gap-6 md:grid-cols-2">
         <section
           aria-labelledby="ultimo-completo-titulo"
-          className="rounded-[var(--radius-md)] border border-[var(--color-border)] p-4"
+          className="rounded-[var(--radius-lg)] border border-[var(--color-border)] shadow-[var(--shadow-sm)] p-6"
         >
           <h2 id="ultimo-completo-titulo" className="mt-0">
             Último respaldo completo
@@ -331,7 +331,7 @@ export default function RespaldosPage() {
 
         <section
           aria-labelledby="acciones-titulo"
-          className="rounded-[var(--radius-md)] border border-[var(--color-border)] p-4"
+          className="rounded-[var(--radius-lg)] border border-[var(--color-border)] shadow-[var(--shadow-sm)] p-6"
         >
           <h2 id="acciones-titulo" className="mt-0">
             Acciones

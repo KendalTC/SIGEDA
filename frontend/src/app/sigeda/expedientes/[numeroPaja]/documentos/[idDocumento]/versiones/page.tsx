@@ -65,7 +65,7 @@ export default function VersionesDocumentoPage({
   }
 
   return (
-    <main className="mx-auto flex max-w-3xl flex-col gap-4 p-6">
+    <main className="mx-auto flex max-w-5xl flex-col gap-4 p-8">
       <nav aria-label="Ruta">
         <Link
           href={`/sigeda/expedientes/${numeroPaja}`}

@@ -6,6 +6,7 @@ import { useState, type ReactNode } from "react";
 
 import { useSigedaAuth } from "./auth-context";
 import { InsigniaRespaldo } from "./insignia-respaldo";
+import { CLASE_ENLACE_NAV, CLASE_ENLACE_NAV_ACTIVO, CLASE_ICONO_NAV } from "./nav-estilos";
 import { perfilDisplay } from "./types";
 
 type EnlaceNav = {
@@ -103,10 +104,6 @@ const GRUPOS: GrupoNav[] = [
   },
 ];
 
-const CLASE_ENLACE_BASE =
-  "group flex items-center gap-3 rounded-xl px-3.5 py-2 text-sm font-medium text-[#AFCBDC] transition-[background-color,color,transform] duration-200 ease-out hover:translate-x-[3px] hover:bg-white/10 hover:text-[#EAF4FA] active:translate-x-[3px] active:scale-[0.97]";
-const CLASE_ENLACE_ACTIVO = "bg-white/[0.18] font-semibold text-white hover:bg-white/[0.22]";
-const CLASE_ICONO = "shrink-0 opacity-80 transition-opacity group-hover:opacity-100";
 
 /**
  * Panel lateral de navegación (rediseño del 23/11/2026, aprobado con
@@ -211,9 +208,9 @@ export function BarraLateral() {
                   key={enlace.href}
                   href={enlace.href}
                   aria-current={activo ? "page" : undefined}
-                  className={[CLASE_ENLACE_BASE, activo ? CLASE_ENLACE_ACTIVO : ""].join(" ")}
+                  className={[CLASE_ENLACE_NAV, activo ? CLASE_ENLACE_NAV_ACTIVO : ""].join(" ")}
                 >
-                  <span className={CLASE_ICONO} style={{ opacity: activo ? 1 : undefined }}>
+                  <span className={CLASE_ICONO_NAV} style={{ opacity: activo ? 1 : undefined }}>
                     {enlace.icono}
                   </span>
                   {enlace.etiqueta}
@@ -239,8 +236,8 @@ export function BarraLateral() {
           <InsigniaRespaldo />
 
           <div className="flex flex-col gap-0.5">
-            <Link href="/sigeda/cuenta" className={`${CLASE_ENLACE_BASE} px-3 py-2 text-[13.5px]`}>
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className={CLASE_ICONO}>
+            <Link href="/sigeda/cuenta" className={`${CLASE_ENLACE_NAV} px-3 py-2 text-[13.5px]`}>
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className={CLASE_ICONO_NAV}>
                 <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
                 <circle cx="12" cy="7" r="4" />
               </svg>
@@ -250,9 +247,9 @@ export function BarraLateral() {
               type="button"
               onClick={manejarCerrarSesion}
               disabled={saliendo}
-              className={`${CLASE_ENLACE_BASE} px-3 py-2 text-[13.5px] disabled:cursor-not-allowed disabled:opacity-55`}
+              className={`${CLASE_ENLACE_NAV} px-3 py-2 text-[13.5px] disabled:cursor-not-allowed disabled:opacity-55`}
             >
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className={CLASE_ICONO}>
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className={CLASE_ICONO_NAV}>
                 <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
                 <path d="M16 17l5-5-5-5" />
                 <path d="M21 12H9" />

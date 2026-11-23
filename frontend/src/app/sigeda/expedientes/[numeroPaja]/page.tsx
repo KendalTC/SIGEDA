@@ -367,7 +367,7 @@ export default function ExpedientePage() {
   const esActivo = abonado.estado === "ACTIVO";
 
   return (
-    <main className="mx-auto flex max-w-5xl flex-col gap-6 p-6">
+    <main className="mx-auto flex max-w-7xl flex-col gap-6 p-8">
       <nav aria-label="Ruta">
         <Link href="/sigeda/buscar" className="text-[var(--color-primary)]">
           Buscar expediente
@@ -443,7 +443,7 @@ export default function ExpedientePage() {
       <div className="grid gap-6 md:grid-cols-2">
         <section
           aria-labelledby="datos-abonado-titulo"
-          className="rounded-[var(--radius-md)] border border-[var(--color-border)] p-4"
+          className="rounded-[var(--radius-lg)] border border-[var(--color-border)] shadow-[var(--shadow-sm)] p-6"
         >
           <h2 id="datos-abonado-titulo" className="mt-0">
             Datos del abonado
@@ -468,7 +468,7 @@ export default function ExpedientePage() {
 
         <section
           aria-labelledby="personas-titulo"
-          className="rounded-[var(--radius-md)] border border-[var(--color-border)] p-4"
+          className="rounded-[var(--radius-lg)] border border-[var(--color-border)] shadow-[var(--shadow-sm)] p-6"
         >
           <h2 id="personas-titulo" className="mt-0">
             Personas del expediente
@@ -612,7 +612,7 @@ export default function ExpedientePage() {
         {documentos.length === 0 && !hayFiltrosActivos ? (
           <div
             role="status"
-            className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-4 py-3"
+            className="rounded-[var(--radius-lg)] border border-[var(--color-border)] shadow-[var(--shadow-sm)] bg-[var(--color-surface-muted)] px-4 py-3"
           >
             Este expediente todavía no tiene documentos digitalizados. Mientras
             tanto se consulta en papel.{" "}
@@ -790,7 +790,7 @@ export default function ExpedientePage() {
           <iframe
             title={`Documento ${nombreVisor}`}
             src={urlVisor}
-            className="h-[600px] w-full rounded-[var(--radius-md)] border border-[var(--color-border)]"
+            className="h-[600px] w-full rounded-[var(--radius-lg)] border border-[var(--color-border)] shadow-[var(--shadow-sm)]"
           />
         </section>
       ) : null}

@@ -281,7 +281,7 @@ export default function ModificarAbonadoPage() {
     abonado.titular_vigente !== null && abonado.titular_vigente.identificacion === null;
 
   return (
-    <main className="mx-auto flex max-w-4xl flex-col gap-6 p-6">
+    <main className="mx-auto flex max-w-6xl flex-col gap-6 p-8">
       <nav aria-label="Ruta">
         <Link
           href={`/sigeda/expedientes/${numeroPaja}`}
@@ -331,7 +331,7 @@ export default function ModificarAbonadoPage() {
         </div>
       ) : null}
 
-      <fieldset className="rounded-[var(--radius-md)] border border-[var(--color-border)] p-4">
+      <fieldset className="rounded-[var(--radius-lg)] border border-[var(--color-border)] shadow-[var(--shadow-sm)] p-6">
         <legend className="px-1 text-lg font-semibold">Datos del abonado</legend>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -408,7 +408,7 @@ export default function ModificarAbonadoPage() {
 
       <section
         aria-labelledby="titular-vigente-titulo"
-        className="rounded-[var(--radius-md)] border border-[var(--color-border)] p-4"
+        className="rounded-[var(--radius-lg)] border border-[var(--color-border)] shadow-[var(--shadow-sm)] p-6"
       >
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 id="titular-vigente-titulo" className="mt-0">
@@ -436,7 +436,7 @@ export default function ModificarAbonadoPage() {
         </p>
 
         {titularSinIdentificacion ? (
-          <div className="mt-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-3">
+          <div className="mt-3 rounded-[var(--radius-lg)] border border-[var(--color-border)] shadow-[var(--shadow-sm)] bg-[var(--color-surface-muted)] p-5">
             <p className="font-medium">Completar identificación del titular</p>
 
             {conflictoIdentificacionTitular ? (
@@ -544,7 +544,7 @@ export default function ModificarAbonadoPage() {
 
       <section
         aria-labelledby="personas-asociadas-titulo"
-        className="rounded-[var(--radius-md)] border border-[var(--color-border)] p-4"
+        className="rounded-[var(--radius-lg)] border border-[var(--color-border)] shadow-[var(--shadow-sm)] p-6"
       >
         <h2 id="personas-asociadas-titulo" className="mt-0">
           Personas asociadas (cotitulares y persona apoderada)

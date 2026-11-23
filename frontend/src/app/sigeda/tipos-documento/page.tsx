@@ -274,7 +274,7 @@ export default function TiposDocumentoPage() {
 
   if (error && tipos.length === 0) {
     return (
-      <main className="mx-auto flex max-w-5xl flex-col gap-4 p-6">
+      <main className="mx-auto flex max-w-7xl flex-col gap-4 p-8">
         <h1>Tipos de documento</h1>
         <div
           role="alert"
@@ -288,7 +288,7 @@ export default function TiposDocumentoPage() {
   }
 
   return (
-    <main className="mx-auto flex max-w-5xl flex-col gap-6 p-6">
+    <main className="mx-auto flex max-w-7xl flex-col gap-6 p-8">
       <nav aria-label="Ruta">
         <Link href="/sigeda/buscar" className="text-[var(--color-primary)]">
           Buscar expediente
@@ -377,7 +377,7 @@ export default function TiposDocumentoPage() {
 
         <form
           onSubmit={manejarEnvio}
-          className="mt-3 flex flex-col gap-4 rounded-[var(--radius-md)] border border-[var(--color-border)] p-4"
+          className="mt-3 flex flex-col gap-4 rounded-[var(--radius-lg)] border border-[var(--color-border)] shadow-[var(--shadow-sm)] p-6"
         >
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-[2fr_1fr]">
             <div className="flex flex-col gap-1.5">
@@ -496,7 +496,7 @@ export default function TiposDocumentoPage() {
             {grupos.map((grupo) => (
               <li
                 key={grupo.id_grupo_alternativas}
-                className="rounded-[var(--radius-md)] border border-[var(--color-border)] p-4"
+                className="rounded-[var(--radius-lg)] border border-[var(--color-border)] shadow-[var(--shadow-sm)] p-6"
               >
                 <p className="font-semibold">
                   {grupo.nombre} · {textoObligatoriedadGrupo(grupo.obligatoriedad)}

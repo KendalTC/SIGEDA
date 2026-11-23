@@ -169,7 +169,7 @@ export default function CompletitudPage() {
 
   if (error && !datos) {
     return (
-      <main className="mx-auto flex max-w-5xl flex-col gap-4 p-6">
+      <main className="mx-auto flex max-w-7xl flex-col gap-4 p-8">
         <h1>Completitud</h1>
         <div
           role="alert"
@@ -203,7 +203,7 @@ export default function CompletitudPage() {
     tarjetas.incompletos === 0 && tarjetas.tipo_pendiente === 0 && !hayFiltrosActivos;
 
   return (
-    <main className="mx-auto flex max-w-6xl flex-col gap-6 p-6">
+    <main className="mx-auto flex max-w-[88rem] flex-col gap-6 p-8">
       <nav aria-label="Ruta">
         <Link href="/sigeda/buscar" className="text-[var(--color-primary)]">
           Buscar expediente
@@ -233,21 +233,21 @@ export default function CompletitudPage() {
       ) : null}
 
       <div className="grid gap-4 sm:grid-cols-4">
-        <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] border-l-4 border-l-[var(--color-success)] p-4">
+        <div className="rounded-[var(--radius-lg)] border border-[var(--color-border)] shadow-[var(--shadow-sm)] border-l-4 border-l-[var(--color-success)] p-6">
           <p className="text-3xl font-bold">{tarjetas.completos}</p>
           <p className="text-sm text-[var(--color-text-muted)]">Completos</p>
         </div>
-        <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] border-l-4 border-l-[var(--color-danger)] p-4">
+        <div className="rounded-[var(--radius-lg)] border border-[var(--color-border)] shadow-[var(--shadow-sm)] border-l-4 border-l-[var(--color-danger)] p-6">
           <p className="text-3xl font-bold">{tarjetas.incompletos}</p>
           <p className="text-sm text-[var(--color-text-muted)]">Incompletos</p>
         </div>
-        <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] border-l-4 border-l-[var(--color-warning)] p-4">
+        <div className="rounded-[var(--radius-lg)] border border-[var(--color-border)] shadow-[var(--shadow-sm)] border-l-4 border-l-[var(--color-warning)] p-6">
           <p className="text-3xl font-bold">{tarjetas.tipo_pendiente}</p>
           <p className="text-sm text-[var(--color-text-muted)]">
             Tipo pendiente (de {tarjetas.total_activos} activos)
           </p>
         </div>
-        <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] border-l-4 border-l-[var(--color-border-strong)] p-4">
+        <div className="rounded-[var(--radius-lg)] border border-[var(--color-border)] shadow-[var(--shadow-sm)] border-l-4 border-l-[var(--color-border-strong)] p-6">
           <p className="text-3xl font-bold">{tarjetas.total_activos}</p>
           <p className="text-sm text-[var(--color-text-muted)]">
             Total activos (los de baja no cuentan)
@@ -349,7 +349,7 @@ export default function CompletitudPage() {
       {mostrarDeBaja && datos.de_baja ? (
         <p
           role="status"
-          className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-4 py-3"
+          className="rounded-[var(--radius-lg)] border border-[var(--color-border)] shadow-[var(--shadow-sm)] bg-[var(--color-surface-muted)] px-4 py-3"
         >
           Abonados de baja con estos mismos filtros de sector y tipo:{" "}
           <strong>{datos.de_baja.cantidad}</strong>. No cuentan en ninguna
@@ -376,7 +376,7 @@ export default function CompletitudPage() {
       {mostrarAvisoCompleto ? (
         <div
           role="status"
-          className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-4 py-3"
+          className="rounded-[var(--radius-lg)] border border-[var(--color-border)] shadow-[var(--shadow-sm)] bg-[var(--color-surface-muted)] px-4 py-3"
         >
           Los expedientes completos no se listan aquí, solo se cuentan en la
           tarjeta «Completos» (arriba). Para verlos uno por uno, use «Buscar
