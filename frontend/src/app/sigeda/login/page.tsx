@@ -229,7 +229,7 @@ export default function SigedaLoginPage() {
     return (
       <PantallaAutenticacion>
       <main className="sigeda-aparecer relative w-full max-w-[400px] rounded-[var(--radius-lg)] border border-[var(--color-border-soft)] bg-surface p-10 shadow-[var(--shadow-lg)]">
-        <h2 className="mt-0">Cree su contraseña</h2>
+        <h1 className="mt-0">Cree su contraseña</h1>
         <p className="text-[var(--color-text-muted)]">
           Ingresó con una contraseña temporal asignada desde la otra cuenta.
           Antes de continuar, cree una propia.
