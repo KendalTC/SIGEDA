@@ -1,4 +1,4 @@
-name: lics-prod
+name: sigeda-prod
 
 services:
   postgres:
@@ -34,14 +34,14 @@ services:
       - no-new-privileges:true
 
   backend:
-    image: lics-backend:${LICS_VERSION:?LICS_VERSION is required}
+    image: sigeda-backend:${SIGEDA_VERSION:?SIGEDA_VERSION is required}
     platform: linux/amd64
     restart: unless-stopped
     env_file:
       - .env.prod
     environment:
       DJANGO_SETTINGS_MODULE: config.settings.production
-      APP_VERSION: ${LICS_VERSION:?LICS_VERSION is required}
+      APP_VERSION: ${SIGEDA_VERSION:?SIGEDA_VERSION is required}
       POSTGRES_HOST: postgres
       POSTGRES_PORT: "5432"
     depends_on:
@@ -49,6 +49,9 @@ services:
         condition: service_healthy
     volumes:
       - backend_media:/app/src/media
+      - sigeda_documentos_cifrados:/app/almacen_cifrado
+      - sigeda_respaldos:/app/respaldos
+      - sigeda_exportaciones:/app/exportaciones
     healthcheck:
       test:
         [
@@ -72,7 +75,7 @@ services:
       - no-new-privileges:true
 
   frontend:
-    image: lics-frontend:${LICS_VERSION:?LICS_VERSION is required}
+    image: sigeda-frontend:${SIGEDA_VERSION:?SIGEDA_VERSION is required}
     platform: linux/amd64
     restart: unless-stopped
     environment:
@@ -138,6 +141,9 @@ services:
 volumes:
   postgres_data:
   backend_media:
+  sigeda_documentos_cifrados:
+  sigeda_respaldos:
+  sigeda_exportaciones:
 
 networks:
   application:

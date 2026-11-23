@@ -2,10 +2,10 @@
 
 set -Eeuo pipefail
 
-PROJECT_DIR="/opt/lics"
+PROJECT_DIR="/opt/sigeda"
 
-SERVICE_NAME="lics-backup.service"
-TIMER_NAME="lics-backup.timer"
+SERVICE_NAME="sigeda-backup.service"
+TIMER_NAME="sigeda-backup.timer"
 
 SOURCE_SERVICE_FILE="${PROJECT_DIR}/infra/systemd/${SERVICE_NAME}"
 SOURCE_TIMER_FILE="${PROJECT_DIR}/infra/systemd/${TIMER_NAME}"
@@ -13,7 +13,7 @@ SOURCE_TIMER_FILE="${PROJECT_DIR}/infra/systemd/${TIMER_NAME}"
 TARGET_SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}"
 TARGET_TIMER_FILE="/etc/systemd/system/${TIMER_NAME}"
 
-TIMER_ON_CALENDAR="${LICS_BACKUP_TIMER_ON_CALENDAR:-*-*-* 03:00:00}"
+TIMER_ON_CALENDAR="${SIGEDA_BACKUP_TIMER_ON_CALENDAR:-*-*-* 03:00:00}"
 
 log_info() {
     printf '[INFO] %s\n' "$*"
@@ -56,11 +56,13 @@ require_project_layout() {
     [[ -f "${SOURCE_TIMER_FILE}" ]] \
         || die "No existe ${SOURCE_TIMER_FILE}."
 
-    [[ -x "${PROJECT_DIR}/scripts/backup.sh" ]] \
-        || die "No existe o no es ejecutable backup.sh."
+    [[ -f "${PROJECT_DIR}/infra/docker/compose.prod.yml" ]] \
+        || die "No existe ${PROJECT_DIR}/infra/docker/compose.prod.yml."
 
-    [[ -x "${PROJECT_DIR}/scripts/cleanup-backups.sh" ]] \
-        || die "No existe o no es ejecutable cleanup-backups.sh."
+    command -v docker >/dev/null 2>&1 \
+        || die "No se encontró docker. El respaldo real lo ejecuta \
+'docker compose exec backend python src/manage.py respaldar automatico' \
+(apps/respaldos, RF-16/ADR-03)."
 }
 
 install_units() {

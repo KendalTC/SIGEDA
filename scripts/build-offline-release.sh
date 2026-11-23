@@ -18,7 +18,7 @@
 #
 # Salida:
 #
-#   release/lics-<version>-linux-amd64/
+#   release/sigeda-<version>-linux-amd64/
 
 set -Eeuo pipefail
 
@@ -28,7 +28,7 @@ PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 readonly SCRIPT_DIR
 readonly PROJECT_ROOT
 
-RELEASE_ROOT="${LICS_RELEASE_ROOT:-${PROJECT_ROOT}/release}"
+RELEASE_ROOT="${SIGEDA_RELEASE_ROOT:-${PROJECT_ROOT}/release}"
 TARGET_PLATFORM="linux/amd64"
 
 VERSION=""
@@ -106,8 +106,8 @@ load_version() {
 
 required_images() {
     printf '%s\n' \
-        "lics-backend:${VERSION}" \
-        "lics-frontend:${VERSION}" \
+        "sigeda-backend:${VERSION}" \
+        "sigeda-frontend:${VERSION}" \
         "nginx:1.28-alpine" \
         "postgres:17-alpine"
 }
@@ -116,11 +116,11 @@ archive_name_for_image() {
     local image_name="$1"
 
     case "${image_name}" in
-        lics-backend:*)
-            printf 'lics-backend-%s-linux-amd64.tar\n' "${VERSION}"
+        sigeda-backend:*)
+            printf 'sigeda-backend-%s-linux-amd64.tar\n' "${VERSION}"
             ;;
-        lics-frontend:*)
-            printf 'lics-frontend-%s-linux-amd64.tar\n' "${VERSION}"
+        sigeda-frontend:*)
+            printf 'sigeda-frontend-%s-linux-amd64.tar\n' "${VERSION}"
             ;;
         nginx:1.28-alpine)
             printf 'nginx-1.28-alpine-linux-amd64.tar\n'
@@ -163,14 +163,14 @@ build_product_images() {
 
     docker buildx build \
         --platform "${TARGET_PLATFORM}" \
-        --tag "lics-backend:${VERSION}" \
+        --tag "sigeda-backend:${VERSION}" \
         --file "${PROJECT_ROOT}/backend/Dockerfile.prod" \
         --load \
         "${PROJECT_ROOT}/backend"
 
     docker buildx build \
         --platform "${TARGET_PLATFORM}" \
-        --tag "lics-frontend:${VERSION}" \
+        --tag "sigeda-frontend:${VERSION}" \
         --file "${PROJECT_ROOT}/frontend/Dockerfile.prod" \
         --load \
         "${PROJECT_ROOT}/frontend"
@@ -220,7 +220,7 @@ validate_images() {
 }
 
 prepare_directories() {
-    RELEASE_NAME="lics-${VERSION}-linux-amd64"
+    RELEASE_NAME="sigeda-${VERSION}-linux-amd64"
     TEMP_DIRECTORY="${RELEASE_ROOT}/.${RELEASE_NAME}.tmp"
     FINAL_DIRECTORY="${RELEASE_ROOT}/${RELEASE_NAME}"
 

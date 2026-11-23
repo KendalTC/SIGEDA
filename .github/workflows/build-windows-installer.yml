@@ -5,9 +5,9 @@ name: build-windows-installer
 # GB), y eso no tiene sentido subirlo/bajarlo a través de la nube de GitHub.
 #
 # El runner clona el repo en su propia carpeta de trabajo interna en cada
-# corrida (no reutiliza C:\lics-dev\laboratorio-inyeccion-castro-solis), y
+# corrida (no reutiliza C:\sigeda-dev\laboratorio-inyeccion-castro-solis), y
 # el .tar está en .gitignore a propósito (pesa varios GB, nunca va a git).
-# Por eso este workflow lo copia en cada corrida desde C:\lics-build\ (fuera
+# Por eso este workflow lo copia en cada corrida desde C:\sigeda-build\ (fuera
 # del repo, generado una sola vez con wsl/build-golden-image.ps1) hacia
 # adentro del checkout — así no depende de una copia manual que además se
 # borraría con cada checkout limpio. Lo mismo aplica al MSI del runtime de
@@ -22,7 +22,7 @@ on:
 
 jobs:
   build:
-    runs-on: [self-hosted, Windows, lics-windows]
+    runs-on: [self-hosted, Windows, sigeda-windows]
     defaults:
       run:
         working-directory: infra/windows/electron
@@ -34,10 +34,10 @@ jobs:
         with:
           node-version: 20
 
-      - name: Copiar la imagen dorada desde C:\lics-build
+      - name: Copiar la imagen dorada desde C:\sigeda-build
         run: |
-          $source = "C:\lics-build\lics-wsl-rootfs.tar"
-          $dest = "resources\windows\lics-wsl-rootfs.tar"
+          $source = "C:\sigeda-build\sigeda-wsl-rootfs.tar"
+          $dest = "resources\windows\sigeda-wsl-rootfs.tar"
           if (-not (Test-Path $source)) {
             Write-Error "Falta $source en este runner. Corré wsl/build-golden-image.ps1 una vez en esta misma máquina antes de disparar este workflow (ver infra/windows/README.md)."
             exit 1
@@ -46,11 +46,11 @@ jobs:
           Copy-Item -Path $source -Destination $dest -Force
           Write-Host "Imagen dorada copiada: $((Get-Item $dest).Length / 1GB) GB"
 
-      - name: Copiar el runtime de WSL2 desde C:\lics-build
+      - name: Copiar el runtime de WSL2 desde C:\sigeda-build
         run: |
-          $candidates = @(Get-ChildItem -Path "C:\lics-build" -Filter "wsl.*.x64.msi" -File -ErrorAction SilentlyContinue)
+          $candidates = @(Get-ChildItem -Path "C:\sigeda-build" -Filter "wsl.*.x64.msi" -File -ErrorAction SilentlyContinue)
           if ($candidates.Count -ne 1) {
-            Write-Error "Se esperaba exactamente un wsl.*.x64.msi en C:\lics-build (hay $($candidates.Count)). El instalador lo necesita para poder instalar WSL2 en una maquina del cliente sin internet (ver infra/windows/README.md)."
+            Write-Error "Se esperaba exactamente un wsl.*.x64.msi en C:\sigeda-build (hay $($candidates.Count)). El instalador lo necesita para poder instalar WSL2 en una maquina del cliente sin internet (ver infra/windows/README.md)."
             exit 1
           }
           Remove-Item "resources\windows\wsl.*.x64.msi" -Force -ErrorAction SilentlyContinue
@@ -73,5 +73,5 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: LICS-Setup
+          name: SIGEDA-Setup
           path: infra/windows/electron/dist/*.exe

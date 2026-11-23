@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8" />
-<title>LICS</title>
+<title>SIGEDA</title>
 <style>
   html, body {
     height: 100%;
@@ -132,7 +132,7 @@
 </head>
 <body>
   <div class="spinner" id="spinner"></div>
-  <h1>LICS</h1>
+  <h1>SIGEDA</h1>
   <p id="phase" hidden></p>
   <p id="hint" hidden></p>
   <div id="status">Iniciando...</div>
@@ -152,11 +152,11 @@
     const statusEl = document.getElementById('status');
     const logEl = document.getElementById('log');
 
-    window.lics.onStatus((text) => {
+    window.sigeda.onStatus((text) => {
       statusEl.textContent = text;
     });
 
-    window.lics.onPhase((phase) => {
+    window.sigeda.onPhase((phase) => {
       const phaseEl = document.getElementById('phase');
       const hintEl = document.getElementById('hint');
 
@@ -166,7 +166,7 @@
       hintEl.hidden = !phase.hint;
     });
 
-    window.lics.onLog((line) => {
+    window.sigeda.onLog((line) => {
       const isAtBottom =
         logEl.scrollHeight - logEl.scrollTop - logEl.clientHeight < 24;
 
@@ -192,7 +192,7 @@
       }
     });
 
-    window.lics.onFailed((failure) => {
+    window.sigeda.onFailed((failure) => {
       document.getElementById('spinner').hidden = true;
       document.getElementById('hint').hidden = true;
       document.getElementById('failure-title').textContent = failure.title;
@@ -218,13 +218,13 @@
       logPathEl.hidden = !failure.logPath;
 
       statusEl.textContent =
-        '"Reintentar" vuelve a iniciar los servicios y abre LICS.';
+        '"Reintentar" vuelve a iniciar los servicios y abre SIGEDA.';
       document.getElementById('failure').hidden = false;
     });
 
     document.getElementById('retry').addEventListener('click', () => {
       document.getElementById('retry').disabled = true;
-      window.lics.retry();
+      window.sigeda.retry();
     });
   </script>
 </body>

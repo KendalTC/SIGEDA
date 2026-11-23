@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 
-# Corre DENTRO de la distro lics-wsl (como root, usuario por defecto de esta
-# distro) para actualizar una instalación existente de LICS -- backend
+# Corre DENTRO de la distro sigeda-wsl (como root, usuario por defecto de esta
+# distro) para actualizar una instalación existente de SIGEDA -- backend
 # Django y frontend Next incluidos -- usando scripts/update.sh, que ya vive
-# en /opt/lics y hace todo el trabajo real de forma segura (checksums,
+# en /opt/sigeda y hace todo el trabajo real de forma segura (checksums,
 # respaldo obligatorio antes de tocar nada, migraciones, healthcheck final,
 # conserva una copia completa de la versión anterior).
 #
 # Invocado por infra/windows/electron/lib/backend.js (función
-# updateApplication), a su vez disparado desde el menú "LICS > Actualizar
+# updateApplication), a su vez disparado desde el menú "SIGEDA > Actualizar
 # aplicación" en main.js, con confirmación explícita del usuario antes de
 # llamarlo -- no es automático.
 #
@@ -17,7 +17,7 @@
 # release completo (VERSION, manifest.txt, SHA256SUMS, app/, images/) al
 # lado. Ese paquete vive en la máquina Windows, no dentro de la distro.
 # Este script encuentra el release más nuevo ya copiado a mano a
-# C:\lics-dev\ (mismo lugar y mismo criterio -- carpeta con app/ e images/,
+# C:\sigeda-dev\ (mismo lugar y mismo criterio -- carpeta con app/ e images/,
 # la más nueva por fecha de modificación -- que usa wsl/cut-release.ps1
 # para la imagen dorada), lo copia a un directorio nativo de WSL (no corre
 # directo sobre /mnt/c: más lento cruzando la frontera drvfs y con semántica
@@ -32,8 +32,8 @@
 
 set -Eeuo pipefail
 
-WINDOWS_RELEASES_DIR="/mnt/c/lics-dev"
-STAGING_ROOT="/opt/lics-updates"
+WINDOWS_RELEASES_DIR="/mnt/c/sigeda-dev"
+STAGING_ROOT="/opt/sigeda-updates"
 
 log_info() {
     printf '[INFO] %s\n' "$*"
@@ -57,11 +57,11 @@ die() {
 }
 
 if [[ "$(id -u)" -ne 0 ]]; then
-    die "Este script debe correr como root (usuario por defecto de lics-wsl)."
+    die "Este script debe correr como root (usuario por defecto de sigeda-wsl)."
 fi
 
 if [[ ! -d "${WINDOWS_RELEASES_DIR}" ]]; then
-    die "No se encontró ${WINDOWS_RELEASES_DIR} -- ¿existe C:\\lics-dev\\ en Windows y tiene algo adentro?"
+    die "No se encontró ${WINDOWS_RELEASES_DIR} -- ¿existe C:\\sigeda-dev\\ en Windows y tiene algo adentro?"
 fi
 
 log_info "Buscando el release offline más reciente en ${WINDOWS_RELEASES_DIR}..."
@@ -70,7 +70,7 @@ newest_dir=""
 newest_mtime=0
 other_candidates=()
 
-for candidate in "${WINDOWS_RELEASES_DIR}"/lics-*-linux-amd64/; do
+for candidate in "${WINDOWS_RELEASES_DIR}"/sigeda-*-linux-amd64/; do
     [[ -d "${candidate}" ]] || continue
     [[ -d "${candidate}app" ]] || continue
     [[ -d "${candidate}images" ]] || continue
@@ -90,7 +90,7 @@ for candidate in "${WINDOWS_RELEASES_DIR}"/lics-*-linux-amd64/; do
 done
 
 if [[ -z "${newest_dir}" ]]; then
-    die "No se encontró ningún release válido bajo ${WINDOWS_RELEASES_DIR} (se espera una carpeta tipo lics-<versión>-linux-amd64 con app/ e images/ adentro). Copiá ahí el release generado con build-offline-release.sh antes de actualizar."
+    die "No se encontró ningún release válido bajo ${WINDOWS_RELEASES_DIR} (se espera una carpeta tipo sigeda-<versión>-linux-amd64 con app/ e images/ adentro). Copiá ahí el release generado con build-offline-release.sh antes de actualizar."
 fi
 
 release_name="$(basename "${newest_dir}")"
@@ -130,6 +130,6 @@ else
     printf '\n'
     log_error "La actualización falló (código ${update_exit_code})."
     log_error "Se conserva la copia del release en ${staging_dir} para diagnóstico -- no se borra sola."
-    log_error "Revisar también si quedó /opt/lics.previous.<timestamp> (update.sh la crea antes de tocar /opt/lics)."
+    log_error "Revisar también si quedó /opt/sigeda.previous.<timestamp> (update.sh la crea antes de tocar /opt/sigeda)."
     exit "${update_exit_code}"
 fi

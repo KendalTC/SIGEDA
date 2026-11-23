@@ -44,21 +44,25 @@ Versión actual:
 
     0.1.0
 
-Estado actual (Avance de Construcción, 06/11/2026):
+Estado actual (23/11/2026):
 
     Script DDL del Modelo ER v1.1 (14 tablas) generado y verificado: db/ddl/sigeda_v1.1.sql.
     Modelos Django de las 14 tablas, con CHECK, UQ parciales, los 2 EXCLUDE de vinculo_abonado
     (RN-02) y llaves primarias compuestas (Django 5.2).
-    Rebanada vertical de CU-04 Cargar documento: backend (ControladorDocumentos, cifrado
-    AES-256-GCM, SHA-256, bitácora de solo inserción), API REST y frontend (PAN-05 con sus 6
-    estados, PAN-04 y PAN-13 mínimos), con la guía de estilo propia de SIGEDA.
-    Prueba de terminado ejecutada contra el stack real, con evidencia real (no inventada) en
-    docs/evidencia/prueba_terminado_CU04.md.
-    0 infracciones de accesibilidad (axe-core) en las pantallas construidas.
+    Incrementos 1 a 4 completos y cerrados, cada uno con prueba de terminado real contra el
+    stack real (evidencia en docs/evidencia/, no inventada) y 0 infracciones de accesibilidad
+    (axe-core): CU-04 cargar documento (PAN-05); sesión y cuentas (PAN-01, PAN-14, RNF-09);
+    expediente completo (PAN-02, PAN-04, PAN-06, PAN-13) con sus diálogos; respaldo y
+    restauración cifrados (PAN-08, D-05); importación de SADA (PAN-09); tipos de documento
+    (PAN-10, CRUD real); completitud a fondo (PAN-07); bitácora (PAN-11); exportación (PAN-12).
+    252 pruebas automáticas del backend en verde (1 omitida, limitación documentada de rol de
+    Postgres superusuario en desarrollo).
     Apps de negocio de LICS y su documentación histórica retiradas del repositorio.
-    Resto del sistema (sesión y cuentas, expediente completo, respaldo y restauración,
-    importación de SADA, tipos de documento, completitud, bitácora, exportación): sin construir
-    todavía — ver Incrementos 2 a 4 en CLAUDE.md, sección 9.
+    Despliegue de producción confirmado (23/11/2026): laptop Windows de la ASADA. El
+    instalador de infra/windows/ (Electron + WSL2 + Docker Engine) quedó renombrado
+    lics→sigeda ese mismo día, junto con infra/systemd/, scripts/ y el workflow de
+    GitHub Actions — ver Pendientes principales para lo que falta antes de instalarlo en
+    hardware real.
 
 ---
 
@@ -86,15 +90,17 @@ Todos los componentes se ejecutan como servicios independientes mediante Docker 
 documentos cargados se cifran con AES-256-GCM antes de guardarse en un volumen aparte del de
 PostgreSQL; la clave vive fuera del repositorio.
 
-El despliegue de producción de SIGEDA (laptop local de la ASADA o una máquina virtual Linux en
-Azure) sigue sin decidirse. El despliegue de LICS para Windows (Electron + WSL2 + Docker Engine) se
-conserva en el repositorio como referencia — ver [Despliegue en Windows](infra/windows/README.md) —
-pero todavía no aplica a SIGEDA.
+El despliegue de producción de SIGEDA es la laptop Windows de la ASADA (confirmado el
+23/11/2026). `infra/windows/` (Electron + WSL2 + Docker Engine), renombrado lics→sigeda ese
+mismo día, es el instalador real a terminar — ver [Despliegue en Windows](infra/windows/README.md).
+Falta compilarlo y probarlo contra hardware Windows real (no se puede desde un entorno
+Linux/WSL2 de desarrollo) y volver a registrar el runner self-hosted de GitHub Actions con su
+label nuevo.
 
 Documentación relacionada:
 
 - [Arquitectura del sistema](docs/architecture.md)
-- [Despliegue en Windows de LICS (referencia, no vigente para SIGEDA)](infra/windows/README.md)
+- [Despliegue en Windows](infra/windows/README.md)
 
 ---
 
@@ -235,9 +241,9 @@ Documentos técnicos (heredados de LICS, todavía vigentes para SIGEDA):
 - [Seguridad](docs/security.md)
 - [Sistema de diseño del frontend (de LICS; ver nota sobre la guía propia de SIGEDA)](docs/frontend-design-system.md)
 
-Evidencia propia de SIGEDA:
-
-- [Prueba de terminado — CU-04 Cargar documento](docs/evidencia/prueba_terminado_CU04.md)
+Evidencia propia de SIGEDA (`docs/evidencia/`): una prueba de terminado real por incremento,
+desde [CU-04 Cargar documento](docs/evidencia/prueba_terminado_CU04.md) hasta
+[Incremento 4 — tipos, completitud, bitácora, exportar](docs/evidencia/prueba_terminado_incremento4.md).
 
 ---
 
@@ -245,24 +251,25 @@ Evidencia propia de SIGEDA:
 
     Django check: OK
     Migraciones: al día
-    Tests backend: 54/54 en verde (make test)
-    Tests propios de SIGEDA: 40/40 en verde (make test-sigeda)
+    Tests backend: 252/252 en verde, 1 omitida (make test) — limitación documentada: rol de
+    Postgres superusuario en desarrollo (ADR-05 sin efecto real todavía)
+    Tests propios de SIGEDA: 238/238 en verde, 1 omitida (make test-sigeda)
     Accesibilidad (axe-core): 0 infracciones en las pantallas de SIGEDA construidas
 
 ---
 
 # Pendientes principales
 
-1. Renombrar «lics» → «sigeda» en `infra/docker/compose.prod.yml`, `scripts/` y lo que referencian
-   (`LICS_VERSION`, nombres de imagen): se dejó para cuando se decida el despliegue de producción
-   de SIGEDA, junto con `infra/windows/` e `infra/systemd/`.
-2. Incremento 2: sesión y cuentas (PAN-01, PAN-14, RNF-09 completo, contraseña temporal) y
-   expediente completo (PAN-02, PAN-04, PAN-06, PAN-13) con sus diálogos.
-3. Incremento 3: respaldo y restauración (incluye cifrar los documentos del respaldo, restaurar
-   desde la aplicación sin borrar la bitácora) e importación de SADA.
-4. Incremento 4: tipos de documento, completitud, bitácora (pantalla) y exportación.
-5. Segundo rol de PostgreSQL con permisos restringidos (solo INSERT/SELECT) para la bitácora en
+1. Compilar y probar el instalador de Windows (`infra/windows/`) contra hardware real: no se
+   puede desde un entorno Linux/WSL2 de desarrollo. El renombrado lics→sigeda, la corrección
+   del respaldo automático systemd (ahora dispara el mecanismo real de `apps/respaldos`, no el
+   `pg_dump` viejo) y la limpieza del modo kiosco descartado ya quedaron hechos (23/11/2026).
+2. Volver a registrar el runner self-hosted de GitHub Actions con el label `sigeda-windows`
+   (antes `lics-windows`) en la máquina física — acción manual, fuera de git.
+3. Segundo rol de PostgreSQL con permisos restringidos (solo INSERT/SELECT) para la bitácora en
    tiempo de ejecución (ADR-05, RNF-11) — por ahora documentado como pendiente, no implementado.
-6. Preguntas abiertas con la administradora (CLAUDE.md, sección 9).
+4. Preguntas abiertas con la administradora (CLAUDE.md, sección 9).
+5. Retención de respaldos: falta "diario vs. semanal" y "2 copias en la laptop" (solo "7 más
+   recientes por destino" implementado — ver `docs/evidencia/prueba_terminado_respaldo_restauracion.md`).
 
 Ver [CLAUDE.md](CLAUDE.md) para el detalle completo de requerimientos y el plan de incrementos.

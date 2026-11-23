@@ -7,7 +7,7 @@
 .DESCRIPTION
     Reemplaza la secuencia manual de:
       1. Encontrar a mano la carpeta de release mas nueva en
-         C:\lics-dev\lics-<version>-linux-amd64
+         C:\sigeda-dev\sigeda-<version>-linux-amd64
       2. Correr build-golden-image.ps1 con -ReleaseDir y -OutputPath
       3. Ir a GitHub > Actions > Run workflow a mano
 
@@ -25,8 +25,8 @@
     la imagen dorada y al final te dice el paso manual que falta.
 
 .PARAMETER ReleaseParentDir
-    Carpeta donde buscar carpetas de release (lics-<version>-linux-amd64).
-    Por defecto C:\lics-dev, se usa la mas nueva por fecha si hay varias.
+    Carpeta donde buscar carpetas de release (sigeda-<version>-linux-amd64).
+    Por defecto C:\sigeda-dev, se usa la mas nueva por fecha si hay varias.
 
 .PARAMETER OutputPath
     Donde dejar el .tar de la imagen dorada.
@@ -38,11 +38,11 @@
     Si se pasa, solo reconstruye la imagen dorada y no toca GitHub Actions.
 
 .PARAMETER Fresh
-    Reconstruye la distro lics-build 100% desde cero (la desregistra si ya
+    Reconstruye la distro sigeda-build 100% desde cero (la desregistra si ya
     existe) en vez de reutilizarla. Usar para el primer release real de
     produccion de un cliente, o cuando se sospeche que la distro acumulo
     estado de builds anteriores (esto fue justo lo que paso con el release
-    2.2.0: LICS_VERSION quedo pegado en una version vieja porque .env.prod
+    2.2.0: SIGEDA_VERSION quedo pegado en una version vieja porque .env.prod
     no se regeneraba en una distro reutilizada).
 
 .EXAMPLE
@@ -50,8 +50,8 @@
 #>
 
 param(
-    [string]$ReleaseParentDir = "C:\lics-dev",
-    [string]$OutputPath = "C:\lics-build\lics-wsl-rootfs.tar",
+    [string]$ReleaseParentDir = "C:\sigeda-dev",
+    [string]$OutputPath = "C:\sigeda-build\sigeda-wsl-rootfs.tar",
     [string]$WorkflowFile = "build-windows-installer.yml",
     [switch]$SkipActions,
     [switch]$Fresh
@@ -61,19 +61,19 @@ $ErrorActionPreference = 'Stop'
 
 function Write-Log {
     param([string]$Message)
-    Write-Host "[LICS-RELEASE] $Message"
+    Write-Host "[SIGEDA-RELEASE] $Message"
 }
 
 # 1. Encontrar el release mas nuevo ------------------------------------------
 
-$candidates = Get-ChildItem -Path $ReleaseParentDir -Directory -Filter 'lics-*-linux-amd64' -ErrorAction SilentlyContinue |
+$candidates = Get-ChildItem -Path $ReleaseParentDir -Directory -Filter 'sigeda-*-linux-amd64' -ErrorAction SilentlyContinue |
     Where-Object {
         (Test-Path (Join-Path $_.FullName 'app')) -and (Test-Path (Join-Path $_.FullName 'images'))
     } |
     Sort-Object LastWriteTime -Descending
 
 if (-not $candidates -or $candidates.Count -eq 0) {
-    Write-Error "No encontre ninguna carpeta de release valida en $ReleaseParentDir (se espera algo tipo lics-<version>-linux-amd64 con app\ e images\ adentro). Corre scripts/build-offline-release.sh en el Mac y copia la carpeta resultante aca primero."
+    Write-Error "No encontre ninguna carpeta de release valida en $ReleaseParentDir (se espera algo tipo sigeda-<version>-linux-amd64 con app\ e images\ adentro). Corre scripts/build-offline-release.sh en el Mac y copia la carpeta resultante aca primero."
     exit 1
 }
 
@@ -97,7 +97,7 @@ if (-not (Test-Path $buildScript)) {
 
 Write-Log "Reconstruyendo la imagen dorada (esto tarda varios minutos)..."
 if ($Fresh) {
-    Write-Log "Fresh activo: la distro lics-build se reconstruye desde cero (mas lento)."
+    Write-Log "Fresh activo: la distro sigeda-build se reconstruye desde cero (mas lento)."
     & $buildScript -ReleaseDir $releaseDir -OutputPath $OutputPath -Fresh
 } else {
     & $buildScript -ReleaseDir $releaseDir -OutputPath $OutputPath
@@ -138,7 +138,7 @@ Start-Sleep -Seconds 5
 gh run watch --exit-status
 
 if ($LASTEXITCODE -eq 0) {
-    Write-Log "LISTO. El .exe nuevo esta en el artifact 'LICS-Setup' de esta corrida, en la pestana Actions de GitHub."
+    Write-Log "LISTO. El .exe nuevo esta en el artifact 'SIGEDA-Setup' de esta corrida, en la pestana Actions de GitHub."
 } else {
     Write-Error "El workflow termino con errores. Revisa el log completo en GitHub Actions."
     exit 1

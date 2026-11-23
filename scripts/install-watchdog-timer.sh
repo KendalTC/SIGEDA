@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 
-# Instala el timer de autocuracion de LICS.
+# Instala el timer de autocuracion de SIGEDA.
 #
 # Este script:
 # - valida que se ejecute en Linux con systemd;
-# - valida que el proyecto esté instalado en /opt/lics;
-# - instala lics-watchdog.service y lics-watchdog.timer;
+# - valida que el proyecto esté instalado en /opt/sigeda;
+# - instala sigeda-watchdog.service y sigeda-watchdog.timer;
 # - recarga systemd;
 # - habilita el timer.
 #
@@ -20,9 +20,9 @@
 
 set -Eeuo pipefail
 
-SERVICE_NAME="lics-watchdog.service"
-TIMER_NAME="lics-watchdog.timer"
-PROJECT_DIR="/opt/lics"
+SERVICE_NAME="sigeda-watchdog.service"
+TIMER_NAME="sigeda-watchdog.timer"
+PROJECT_DIR="/opt/sigeda"
 
 SOURCE_SERVICE_FILE="${PROJECT_DIR}/infra/systemd/${SERVICE_NAME}"
 SOURCE_TIMER_FILE="${PROJECT_DIR}/infra/systemd/${TIMER_NAME}"

@@ -1,5 +1,5 @@
-# Corre durante la instalación del .exe de LICS (ver build/installer.nsh).
-# Prepara WSL2, importa la distro "lics-wsl" desde la imagen dorada offline,
+# Corre durante la instalación del .exe de SIGEDA (ver build/installer.nsh).
+# Prepara WSL2, importa la distro "sigeda-wsl" desde la imagen dorada offline,
 # y registra la tarea programada que la arranca al iniciar sesión.
 #
 # Código de salida:
@@ -15,12 +15,12 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$DistroName = 'lics-wsl'
-$InstallDir = "$env:ProgramData\LICS\wsl"
+$DistroName = 'sigeda-wsl'
+$InstallDir = "$env:ProgramData\SIGEDA\wsl"
 
 function Write-Log {
     param([string]$Message)
-    Write-Host "[LICS-WSL] $Message"
+    Write-Host "[SIGEDA-WSL] $Message"
 }
 
 function Test-VirtualizationEnabled {
@@ -80,7 +80,7 @@ function Install-WslRuntime {
     }
 
     $msi = $candidates[0]
-    $log = Join-Path $env:TEMP 'lics-wsl-runtime-msi.log'
+    $log = Join-Path $env:TEMP 'sigeda-wsl-runtime-msi.log'
     Write-Log "El runtime de WSL2 no esta instalado. Instalando $($msi.Name) sin conexion..."
 
     $proc = Start-Process -FilePath 'msiexec.exe' -Wait -PassThru -ArgumentList @(
@@ -107,7 +107,7 @@ try {
 
     if (-not (Test-Path $RootfsPath)) {
         Write-Log "ERROR: no se encontro la imagen dorada en $RootfsPath"
-        Write-Log "El instalador esta incompleto: falta empaquetar lics-wsl-rootfs.tar junto al .exe."
+        Write-Log "El instalador esta incompleto: falta empaquetar sigeda-wsl-rootfs.tar junto al .exe."
         exit 1
     }
 

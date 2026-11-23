@@ -134,7 +134,7 @@ check_disk_space() {
     local minimum_kb
     local available_mb
 
-    minimum_kb="${LICS_MIN_FREE_DISK_KB:-1048576}"
+    minimum_kb="${SIGEDA_MIN_FREE_DISK_KB:-1048576}"
 
     available_kb="$(
         df -Pk "${PROJECT_ROOT}" \

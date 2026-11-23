@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# Actualiza una instalación existente de LICS desde un paquete offline.
+# Actualiza una instalación existente de SIGEDA desde un paquete offline.
 #
 # Este script debe ejecutarse desde:
 #
@@ -18,15 +18,15 @@
 # - carga de imágenes offline;
 # - preparación de nueva aplicación en directorio temporal;
 # - preservación de .env.prod existente;
-# - actualización de LICS_VERSION;
+# - actualización de SIGEDA_VERSION;
 # - detención controlada de servicios;
-# - reemplazo controlado de /opt/lics;
+# - reemplazo controlado de /opt/sigeda;
 # - ejecución de migraciones;
 # - arranque del sistema;
 # - healthcheck final.
 #
 # Este script no implementa rollback automático.
-# Antes de reemplazar /opt/lics, conserva una copia en /opt/lics.previous.<timestamp>.
+# Antes de reemplazar /opt/sigeda, conserva una copia en /opt/sigeda.previous.<timestamp>.
 
 set -Eeuo pipefail
 
@@ -35,7 +35,7 @@ SOURCE_APP_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 PACKAGE_ROOT="$(cd "${SOURCE_APP_DIR}/.." && pwd)"
 SOURCE_IMAGES_DIR="${PACKAGE_ROOT}/images"
 
-INSTALL_ROOT="${LICS_INSTALL_ROOT:-/opt/lics}"
+INSTALL_ROOT="${SIGEDA_INSTALL_ROOT:-/opt/sigeda}"
 TEMP_INSTALL_ROOT="${INSTALL_ROOT}.updating.$$"
 PREVIOUS_INSTALL_ROOT=""
 
@@ -78,7 +78,7 @@ cleanup_on_error() {
     fi
 
     log_error "Revise el estado manualmente antes de continuar."
-    log_error "Si /opt/lics fue reemplazado, revise la copia anterior:"
+    log_error "Si /opt/sigeda fue reemplazado, revise la copia anterior:"
     log_error "  ${PREVIOUS_INSTALL_ROOT:-no creada}"
 
     exit "${exit_code}"
@@ -158,7 +158,6 @@ validate_package_structure() {
         "${SOURCE_APP_DIR}/infra/docker/compose.prod.yml"
         "${SOURCE_APP_DIR}/scripts/start.sh"
         "${SOURCE_APP_DIR}/scripts/stop.sh"
-        "${SOURCE_APP_DIR}/scripts/backup.sh"
         "${SOURCE_APP_DIR}/scripts/healthcheck.sh"
     )
 
@@ -191,10 +190,10 @@ load_versions() {
         die "La versión del paquete no coincide con app/VERSION."
     fi
 
-    CURRENT_VERSION="$(env_value_from_file "${CURRENT_ENV_FILE}" LICS_VERSION)"
+    CURRENT_VERSION="$(env_value_from_file "${CURRENT_ENV_FILE}" SIGEDA_VERSION)"
 
     if [[ -z "${CURRENT_VERSION}" ]]; then
-        die "No fue posible leer LICS_VERSION de la instalación actual."
+        die "No fue posible leer SIGEDA_VERSION de la instalación actual."
     fi
 
     if [[ "${VERSION}" == "${CURRENT_VERSION}" ]]; then
@@ -212,10 +211,6 @@ validate_existing_installation() {
 
     if [[ ! -f "${CURRENT_ENV_FILE}" ]]; then
         die "No existe el archivo productivo actual: ${CURRENT_ENV_FILE}"
-    fi
-
-    if [[ ! -x "${INSTALL_ROOT}/scripts/backup.sh" ]]; then
-        die "No existe o no es ejecutable: ${INSTALL_ROOT}/scripts/backup.sh"
     fi
 
     if [[ ! -x "${INSTALL_ROOT}/scripts/stop.sh" ]]; then
@@ -243,12 +238,110 @@ run_current_healthcheck() {
     log_ok "La instalación actual está saludable."
 }
 
+# Respaldo pre-update: un volcado lógico de PostgreSQL (pg_dump
+# --format=custom) con metadatos y checksums, en el formato exacto que
+# scripts/rollback.sh espera restaurar con pg_restore
+# (database.dump + metadata.txt + SHA256SUMS). Es un resguardo
+# transitorio de la actualización en sí misma, no el respaldo
+# documental real de RF-16 (ver apps/respaldos, Incremento 3a; ese
+# respaldo cifrado sigue corriendo aparte por su propio temporizador
+# systemd). Antes vivía en scripts/backup.sh (retirado: ese script
+# cubría varios modos que ya reemplazó apps/respaldos — este es el
+# único modo, "pre-update", que todavía hace falta aquí).
 create_pre_update_backup() {
+    local database_name
+    local database_user
+    local timestamp
+    local backup_dir
+    local dump_file
+    local metadata_file
+    local checksum_file
+    local dump_size
+    local postgres_version
+    local dump_checksum
+    local metadata_checksum
+
     log_info "Creando respaldo obligatorio pre-update..."
 
-    "${INSTALL_ROOT}/scripts/backup.sh" pre-update
+    database_name="$(env_value_from_file "${CURRENT_ENV_FILE}" POSTGRES_DB)"
+    database_user="$(env_value_from_file "${CURRENT_ENV_FILE}" POSTGRES_USER)"
+    timestamp="$(date -u '+%Y%m%dT%H%M%SZ')"
+    backup_dir="${INSTALL_ROOT}/backups/sigeda-${CURRENT_VERSION}-pre-update-${timestamp}"
+    dump_file="${backup_dir}/database.dump"
+    metadata_file="${backup_dir}/metadata.txt"
+    checksum_file="${backup_dir}/SHA256SUMS"
 
-    log_ok "Respaldo pre-update completado."
+    if [[ -e "${backup_dir}" ]]; then
+        die "Ya existe una ruta de respaldo con el nombre ${backup_dir}"
+    fi
+
+    mkdir -p "${backup_dir}"
+    chmod 700 "${backup_dir}"
+
+    compose_new exec --no-TTY postgres \
+        pg_dump \
+        --username="${database_user}" \
+        --dbname="${database_name}" \
+        --format=custom \
+        --compress=9 \
+        --no-owner \
+        --no-privileges \
+        > "${dump_file}"
+
+    chmod 600 "${dump_file}"
+
+    if [[ ! -s "${dump_file}" ]]; then
+        die "El archivo de respaldo pre-update fue creado vacío."
+    fi
+
+    if ! compose_new exec --no-TTY postgres \
+        pg_restore --list < "${dump_file}" > /dev/null
+    then
+        die "pg_restore no pudo validar el respaldo pre-update."
+    fi
+
+    postgres_version="$(
+        compose_new exec --no-TTY postgres \
+            psql \
+            --username="${database_user}" \
+            --dbname="${database_name}" \
+            --tuples-only \
+            --no-align \
+            --command='SHOW server_version;' \
+            | tr -d '\r'
+    )"
+
+    dump_size="$(wc -c < "${dump_file}" | tr -d '[:space:]')"
+    dump_checksum="$(sha256sum "${dump_file}" | awk '{print $1}')"
+
+    {
+        printf 'backup_name=sigeda-%s-pre-update-%s\n' "${CURRENT_VERSION}" "${timestamp}"
+        printf 'backup_type=pre-update\n'
+        printf 'created_at_utc=%s\n' "${timestamp}"
+        printf 'application_version=%s\n' "${CURRENT_VERSION}"
+        printf 'database_name=%s\n' "${database_name}"
+        printf 'database_user=%s\n' "${database_user}"
+        printf 'postgres_version=%s\n' "${postgres_version}"
+        printf 'dump_format=custom\n'
+        printf 'dump_file=database.dump\n'
+        printf 'dump_size_bytes=%s\n' "${dump_size}"
+        printf 'dump_sha256=%s\n' "${dump_checksum}"
+        printf 'validation=pg_restore_list_ok\n'
+    } > "${metadata_file}"
+
+    chmod 600 "${metadata_file}"
+
+    metadata_checksum="$(sha256sum "${metadata_file}" | awk '{print $1}')"
+
+    {
+        printf '%s  database.dump\n' "${dump_checksum}"
+        printf '%s  metadata.txt\n' "${metadata_checksum}"
+    } > "${checksum_file}"
+
+    chmod 600 "${checksum_file}"
+
+    log_ok "Respaldo pre-update completado: ${backup_dir}"
+    log_info "Si hace falta revertir, ese directorio es el segundo argumento de scripts/rollback.sh."
 }
 
 image_archives() {
@@ -286,8 +379,8 @@ load_images() {
 
 required_images() {
     printf '%s\n' \
-        "lics-backend:${VERSION}" \
-        "lics-frontend:${VERSION}" \
+        "sigeda-backend:${VERSION}" \
+        "sigeda-frontend:${VERSION}" \
         "nginx:1.28-alpine" \
         "postgres:17-alpine"
 }
@@ -325,7 +418,7 @@ prepare_new_application() {
 
     cp "${CURRENT_ENV_FILE}" "${TEMP_ENV_FILE}"
 
-    set_env_value "${TEMP_ENV_FILE}" "LICS_VERSION" "${VERSION}"
+    set_env_value "${TEMP_ENV_FILE}" "SIGEDA_VERSION" "${VERSION}"
 
     chmod 750 "${TEMP_INSTALL_ROOT}"
     chmod 750 "${TEMP_INSTALL_ROOT}/scripts/"*.sh
@@ -491,11 +584,11 @@ print_result() {
     printf 'Instalación:      %s\n' "${INSTALL_ROOT}"
     printf 'Copia anterior:   %s\n' "${PREVIOUS_INSTALL_ROOT}"
     printf '\n'
-    printf '[OK] LICS quedó actualizado y saludable.\n'
+    printf '[OK] SIGEDA quedó actualizado y saludable.\n'
 }
 
 main() {
-    printf 'Actualizador offline de LICS\n'
+    printf 'Actualizador offline de SIGEDA\n'
     printf '============================\n'
     printf 'Paquete:     %s\n' "${PACKAGE_ROOT}"
     printf 'Instalación: %s\n' "${INSTALL_ROOT}"

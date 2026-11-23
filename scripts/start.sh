@@ -27,7 +27,7 @@ source "${SCRIPT_DIR}/lib/common.sh"
 
 readonly SCRIPT_DIR
 
-START_TIMEOUT_SECONDS="${LICS_START_TIMEOUT_SECONDS:-180}"
+START_TIMEOUT_SECONDS="${SIGEDA_START_TIMEOUT_SECONDS:-180}"
 
 on_error() {
     local exit_code="$?"

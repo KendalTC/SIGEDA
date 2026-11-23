@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# Instala LICS desde un paquete offline versionado.
+# Instala SIGEDA desde un paquete offline versionado.
 #
 # Este script debe ejecutarse desde:
 #
@@ -15,7 +15,7 @@
 # - validación Linux x86_64;
 # - validación de Docker y Docker Compose;
 # - carga de imágenes offline;
-# - instalación atómica en /opt/lics;
+# - instalación atómica en /opt/sigeda;
 # - generación segura de secretos;
 # - inicialización de PostgreSQL;
 # - ejecución de migraciones;
@@ -23,11 +23,8 @@
 # - healthcheck final.
 #
 # Configura automáticamente:
-# - servicio systemd de LICS;
-# - timer systemd de backups automáticos;
-# - usuario operativo dedicado;
-# - autologin de Ubuntu Desktop mediante GDM;
-# - kiosk Chromium para el usuario operativo.
+# - servicio systemd de SIGEDA;
+# - timer systemd de backups automáticos.
 #
 # No configura todavía:
 # - SSH;
@@ -40,7 +37,7 @@ SOURCE_APP_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 PACKAGE_ROOT="$(cd "${SOURCE_APP_DIR}/.." && pwd)"
 SOURCE_IMAGES_DIR="${PACKAGE_ROOT}/images"
 
-INSTALL_ROOT="${LICS_INSTALL_ROOT:-/opt/lics}"
+INSTALL_ROOT="${SIGEDA_INSTALL_ROOT:-/opt/sigeda}"
 TEMP_INSTALL_ROOT="${INSTALL_ROOT}.installing.$$"
 
 COMPOSE_FILE="${INSTALL_ROOT}/infra/docker/compose.prod.yml"
@@ -56,11 +53,11 @@ readonly COMPOSE_FILE
 readonly ENV_FILE
 
 VERSION=""
-POSTGRES_DATABASE="lics"
-POSTGRES_USER="lics"
+POSTGRES_DATABASE="sigeda"
+POSTGRES_USER="sigeda"
 POSTGRES_PASSWORD=""
 DJANGO_SECRET_KEY=""
-HTTP_PORT="${LICS_HTTP_PORT:-80}"
+HTTP_PORT="${SIGEDA_HTTP_PORT:-80}"
 
 INSTALL_DIRECTORY_CREATED=0
 
@@ -125,11 +122,11 @@ require_command() {
 
 validate_http_port() {
     if [[ ! "${HTTP_PORT}" =~ ^[0-9]+$ ]]; then
-        die "LICS_HTTP_PORT debe ser un número."
+        die "SIGEDA_HTTP_PORT debe ser un número."
     fi
 
     if (( HTTP_PORT < 1 || HTTP_PORT > 65535 )); then
-        die "LICS_HTTP_PORT debe estar entre 1 y 65535."
+        die "SIGEDA_HTTP_PORT debe estar entre 1 y 65535."
     fi
 }
 
@@ -146,19 +143,11 @@ validate_package_structure() {
         "${SOURCE_APP_DIR}/scripts/install-preflight.sh"
         "${SOURCE_APP_DIR}/scripts/start.sh"
         "${SOURCE_APP_DIR}/scripts/healthcheck.sh"
-        "${SOURCE_APP_DIR}/infra/systemd/lics.service"
-        "${SOURCE_APP_DIR}/infra/systemd/lics-backup.service"
-        "${SOURCE_APP_DIR}/infra/systemd/lics-backup.timer"
+        "${SOURCE_APP_DIR}/infra/systemd/sigeda.service"
+        "${SOURCE_APP_DIR}/infra/systemd/sigeda-backup.service"
+        "${SOURCE_APP_DIR}/infra/systemd/sigeda-backup.timer"
         "${SOURCE_APP_DIR}/scripts/install-systemd.sh"
         "${SOURCE_APP_DIR}/scripts/install-backup-timer.sh"
-        "${SOURCE_APP_DIR}/scripts/cleanup-backups.sh"
-        "${SOURCE_APP_DIR}/scripts/install-desktop-user.sh"
-        "${SOURCE_APP_DIR}/scripts/install-autologin-gdm.sh"
-        "${SOURCE_APP_DIR}/scripts/install-kiosk.sh"
-        "${SOURCE_APP_DIR}/scripts/install-workstation.sh"
-        "${SOURCE_APP_DIR}/scripts/wait-for-lics.sh"
-        "${SOURCE_APP_DIR}/scripts/start-kiosk.sh"
-        "${SOURCE_APP_DIR}/infra/systemd/lics-kiosk.service"
     )
 
     for required_path in "${required_paths[@]}"; do
@@ -200,8 +189,8 @@ load_version() {
 run_preflight() {
     log_info "Ejecutando comprobaciones de preinstalación..."
 
-    LICS_RELEASE_IMAGES_DIR="${SOURCE_IMAGES_DIR}" \
-    LICS_DISK_CHECK_PATH="/opt" \
+    SIGEDA_RELEASE_IMAGES_DIR="${SOURCE_IMAGES_DIR}" \
+    SIGEDA_DISK_CHECK_PATH="/opt" \
     "${SOURCE_APP_DIR}/scripts/install-preflight.sh"
 
     log_ok "Preinstalación aprobada."
@@ -216,31 +205,6 @@ validate_target() {
     if [[ -e "${TEMP_INSTALL_ROOT}" ]]; then
         die "Ya existe el directorio temporal ${TEMP_INSTALL_ROOT}."
     fi
-}
-
-validate_desktop_requirements() {
-    log_info "Validando entorno gráfico de producción..."
-
-    if [[ ! -d /etc/gdm3 ]] || ! command -v gdm3 >/dev/null 2>&1; then
-        die "Se requiere Ubuntu Desktop con GDM para autologin."
-    fi
-
-    if command -v chromium >/dev/null 2>&1; then
-        log_ok "Chromium disponible."
-        return
-    fi
-
-    if command -v chromium-browser >/dev/null 2>&1; then
-        log_ok "Chromium Browser disponible."
-        return
-    fi
-
-    if command -v google-chrome >/dev/null 2>&1; then
-        log_ok "Google Chrome disponible."
-        return
-    fi
-
-    die "No se encontró Chromium ni Google Chrome. Instale Chromium antes de ejecutar el instalador."
 }
 
 image_archives() {
@@ -279,8 +243,8 @@ load_images() {
 
 required_images() {
     printf '%s\n' \
-        "lics-backend:${VERSION}" \
-        "lics-frontend:${VERSION}" \
+        "sigeda-backend:${VERSION}" \
+        "sigeda-frontend:${VERSION}" \
         "nginx:1.28-alpine" \
         "postgres:17-alpine"
 }
@@ -377,7 +341,7 @@ generate_environment_file() {
     DJANGO_SECRET_KEY="$(generate_secret)"
 
     set_env_value "${environment_file}" \
-        "LICS_VERSION" \
+        "SIGEDA_VERSION" \
         "${VERSION}"
 
     set_env_value "${environment_file}" \
@@ -536,15 +500,6 @@ install_operating_system_services() {
     log_ok "Servicios del sistema operativo instalados."
 }
 
-install_desktop_services() {
-    log_info "Configurando estación gráfica dedicada..."
-
-    "${INSTALL_ROOT}/scripts/install-desktop-user.sh"
-    "${INSTALL_ROOT}/scripts/install-autologin-gdm.sh"
-
-    log_ok "Estación gráfica dedicada configurada."
-}
-
 print_result() {
     printf '\n'
     printf 'Instalación completada\n'
@@ -556,16 +511,15 @@ print_result() {
     printf 'Comandos administrativos:\n'
     printf '  %s/scripts/status.sh\n' "${INSTALL_ROOT}"
     printf '  %s/scripts/healthcheck.sh\n' "${INSTALL_ROOT}"
-    printf '  %s/scripts/backup.sh manual\n' "${INSTALL_ROOT}"
+    printf '  docker compose -f %s/infra/docker/compose.prod.yml exec -T backend python src/manage.py respaldar manual\n' "${INSTALL_ROOT}"
     printf '\n'
-    printf '[OK] LICS quedó instalado y saludable.\n'
-    printf '[OK] El usuario operativo y el kiosco quedaron configurados.\n'
+    printf '[OK] SIGEDA quedó instalado y saludable.\n'
     printf '\n'
     printf 'Reinicie la computadora para validar el arranque automático completo.\n'
 }
 
 main() {
-    printf 'Instalador offline de LICS\n'
+    printf 'Instalador offline de SIGEDA\n'
     printf '==========================\n'
     printf 'Paquete:     %s\n' "${PACKAGE_ROOT}"
     printf 'Instalación: %s\n' "${INSTALL_ROOT}"
@@ -593,7 +547,6 @@ main() {
     load_version
     run_preflight
     validate_target
-    validate_desktop_requirements
     load_images
     validate_loaded_images
     prepare_application_files
@@ -605,7 +558,6 @@ main() {
     start_application
     run_healthcheck
     install_operating_system_services
-    install_desktop_services
     print_result
 }
 

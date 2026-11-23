@@ -24,7 +24,7 @@ function createWindow() {
     height: 800,
     minWidth: 960,
     minHeight: 640,
-    title: 'LICS',
+    title: 'SIGEDA',
     icon: path.join(__dirname, 'build', 'icon.ico'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -70,7 +70,7 @@ function createWindow() {
   // nivel de SO pero el webContents no, y forzamos el refoco en ese caso.
   // Importante: la condición exige win.isFocused() primero, para no robarle
   // nunca el foco del sistema operativo a otra aplicación (Word, Excel,
-  // etc.) cuando LICS está en segundo plano -- esta app no corre en modo
+  // etc.) cuando SIGEDA está en segundo plano -- esta app no corre en modo
   // kiosco y tiene que convivir con el resto del escritorio.
   const focusWatchdog = setInterval(() => {
     if (win.isDestroyed()) {
@@ -96,14 +96,14 @@ function send(channel, payload) {
 }
 
 function setStatus(text) {
-  send('lics:status', text);
+  send('sigeda:status', text);
 }
 
 // Cada línea de salida: pasa a ser el paso actual y entra al historial
 // de la pantalla de carga.
 function reportLine(line) {
   setStatus(line);
-  send('lics:log', line);
+  send('sigeda:log', line);
 }
 
 function setBusy(busy) {
@@ -131,7 +131,7 @@ async function startupSequence() {
     setStatus('Verificando WSL2...');
     await backend.ensureDistroRunning();
 
-    setStatus('Iniciando servicios de LICS (puede tardar un momento)...');
+    setStatus('Iniciando servicios de SIGEDA (puede tardar un momento)...');
     await backend.startServices(reportLine);
 
     setStatus('Esperando a que el sistema responda...');
@@ -143,9 +143,9 @@ async function startupSequence() {
   } catch (err) {
     console.error(err);
     setStatus(
-      'No se pudo iniciar LICS.\n\n' +
+      'No se pudo iniciar SIGEDA.\n\n' +
         String(err.message || err) +
-        '\n\nContacte a soporte técnico. Puede reintentar desde el menú LICS > Reintentar.'
+        '\n\nContacte a soporte técnico. Puede reintentar desde el menú SIGEDA > Reintentar.'
     );
   } finally {
     setBusy(false);
@@ -213,7 +213,7 @@ function saveActionLog(actionLabel, lines, err) {
 }
 
 // "Qué falló": las líneas [ERROR] de los scripts si las hay; si no, el
-// mensaje del error (por ejemplo, LICS no respondió a tiempo).
+// mensaje del error (por ejemplo, SIGEDA no respondió a tiempo).
 function failureReasons(err) {
   if (err.errorLines && err.errorLines.length > 0) {
     return err.errorLines;
@@ -264,7 +264,7 @@ async function runMenuAction({ label, hint, action }) {
     // Hasta que la pantalla de carga no termina de cargar, nadie escucha
     // los mensajes (la app web no los muestra).
     await mainWindow.loadFile(LOADING_PAGE);
-    send('lics:phase', { title: label, hint });
+    send('sigeda:phase', { title: label, hint });
     setStatus(`${label}...`);
 
     await action(onLine);
@@ -279,7 +279,7 @@ async function runMenuAction({ label, hint, action }) {
 
     const logPath = saveActionLog(label, lines, err);
 
-    send('lics:failed', {
+    send('sigeda:failed', {
       title: `${label}: no se completó`,
       reasons: failureReasons(err),
       exitCode: err.exitCode ?? null,
@@ -288,7 +288,7 @@ async function runMenuAction({ label, hint, action }) {
 
     const { response } = await dialog.showMessageBox(mainWindow, {
       type: 'error',
-      title: 'LICS',
+      title: 'SIGEDA',
       buttons: logPath ? ['Cerrar', 'Abrir el registro'] : ['Cerrar'],
       defaultId: 0,
       cancelId: 0,
@@ -307,7 +307,7 @@ async function runMenuAction({ label, hint, action }) {
 function buildMenu() {
   const template = [
     {
-      label: 'LICS',
+      label: 'SIGEDA',
       submenu: [
         {
           id: 'retry',
@@ -324,11 +324,11 @@ function buildMenu() {
             try {
               await backend.getStatus((line) => lines.push(line));
               dialog.showMessageBox(mainWindow, {
-                title: 'Estado de LICS',
+                title: 'Estado de SIGEDA',
                 message: lines.join('\n') || 'Sin datos.',
               });
             } catch (err) {
-              dialog.showErrorBox('LICS', `No se pudo consultar el estado:\n\n${err.message || err}`);
+              dialog.showErrorBox('SIGEDA', `No se pudo consultar el estado:\n\n${err.message || err}`);
             }
           },
         },
@@ -365,9 +365,9 @@ function buildMenu() {
 
             const confirmed = await confirmAction({
               title: 'Reiniciar servicios',
-              message: 'Se detienen y se vuelven a iniciar los servicios de LICS.',
+              message: 'Se detienen y se vuelven a iniciar los servicios de SIGEDA.',
               detail:
-                'Durante unos minutos LICS no está disponible. Lo que no se haya ' +
+                'Durante unos minutos SIGEDA no está disponible. Lo que no se haya ' +
                 'guardado en un formulario abierto se pierde.',
               confirmLabel: 'Reiniciar',
             });
@@ -393,12 +393,12 @@ function buildMenu() {
               buttons: ['Cancelar', 'Actualizar'],
               defaultId: 0,
               cancelId: 0,
-              title: 'Actualizar LICS',
+              title: 'Actualizar SIGEDA',
               message: 'Esto actualiza el backend (Django) y el frontend (Next) a una versión nueva.',
               detail: [
                 'Requisito: ya copiaste la carpeta de release nueva ' +
-                  '(lics-<versión>-linux-amd64, con app\\ e images\\ adentro) ' +
-                  'a C:\\lics-dev\\ en esta máquina.',
+                  '(sigeda-<versión>-linux-amd64, con app\\ e images\\ adentro) ' +
+                  'a C:\\sigeda-dev\\ en esta máquina.',
                 '',
                 'Qué va a pasar: valida el paquete, hace un respaldo obligatorio antes de tocar nada, ' +
                   'detiene los servicios, carga las imágenes nuevas, corre migraciones y vuelve a ' +
@@ -434,7 +434,7 @@ function buildMenu() {
 }
 
 // Botón "Reintentar" de la pantalla de error (renderer/loading.html).
-ipcMain.on('lics:retry', () => {
+ipcMain.on('sigeda:retry', () => {
   retryStartup();
 });
 

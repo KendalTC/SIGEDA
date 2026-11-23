@@ -1,9 +1,9 @@
 {
-  "name": "lics-desktop",
-  "version": "2.5.0",
-  "description": "Aplicacion de escritorio LICS (Laboratorio de Inyeccion Castro Solis)",
+  "name": "sigeda-desktop",
+  "version": "0.1.0",
+  "description": "Aplicacion de escritorio SIGEDA (Sistema de Gestion Documental del Acueducto), sobre la base de codigo de LICS v2.5.0 de Alejandro Arias Rojas",
   "main": "main.js",
-  "author": "Castro Solis",
+  "author": "Equipo SIGEDA (IF6100, UCR Sede de Occidente) — basado en LICS v2.5.0 de Alejandro Arias Rojas",
   "license": "UNLICENSED",
   "private": true,
   "scripts": {
@@ -17,8 +17,8 @@
     "electron-builder": "^24.13.3"
   },
   "build": {
-    "appId": "cr.castrosolis.lics",
-    "productName": "LICS",
+    "appId": "cr.ucr.sigeda",
+    "productName": "SIGEDA",
     "files": [
       "main.js",
       "preload.js",
@@ -41,7 +41,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "LICS",
+      "shortcutName": "SIGEDA",
       "include": "build/installer.nsh"
     }
   }

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 
 # Aprovisiona, sin ninguna interacción humana, la distro WSL2 que se va a
-# exportar como imagen dorada de LICS: instala Docker Engine, copia un
+# exportar como imagen dorada de SIGEDA: instala Docker Engine, copia un
 # release offline ya compilado, carga las imágenes, genera .env.prod, corre
-# migraciones, instala lics.service y lics-backup.timer (SIN modificarlos) y
+# migraciones, instala sigeda.service y sigeda-backup.timer (SIN modificarlos) y
 # valida start.sh/healthcheck.sh tal cual están.
 #
 # Corre como root (no crea un usuario operativo separado: esta distro es un
@@ -11,7 +11,7 @@
 # Lo invoca build-golden-image.ps1 automáticamente; también se puede correr
 # a mano dentro de la distro:
 #
-#   sudo bash provision-golden-image.sh /ruta/al/release/lics-<version>-linux-amd64
+#   sudo bash provision-golden-image.sh /ruta/al/release/sigeda-<version>-linux-amd64
 #
 # Requiere que systemd ya esté activo en la distro (build-golden-image.ps1
 # ya se encarga de eso antes de llamar a este script).
@@ -35,7 +35,7 @@ require_systemd_active() {
 }
 
 require_release_dir() {
-    [[ -n "${RELEASE_DIR}" ]] || die "Uso: $0 /ruta/al/release/lics-<version>-linux-amd64"
+    [[ -n "${RELEASE_DIR}" ]] || die "Uso: $0 /ruta/al/release/sigeda-<version>-linux-amd64"
     [[ -d "${RELEASE_DIR}/app" ]] || die "No existe ${RELEASE_DIR}/app. ¿Es un release válido de build-offline-release.sh?"
     [[ -d "${RELEASE_DIR}/images" ]] || die "No existe ${RELEASE_DIR}/images."
     log_ok "Release encontrado: ${RELEASE_DIR}"
@@ -78,8 +78,8 @@ install_docker_engine() {
 }
 
 install_application() {
-    # A proposito NO se salta si /opt/lics ya existe: reconstruir la imagen
-    # dorada reutilizando una distro lics-build ya aprovisionada (en vez de
+    # A proposito NO se salta si /opt/sigeda ya existe: reconstruir la imagen
+    # dorada reutilizando una distro sigeda-build ya aprovisionada (en vez de
     # una fresca) es un caso real de uso, y antes esto dejaba silenciosamente
     # la version vieja de la app sin actualizar. cp -a sobreescribe los
     # archivos del release sin tocar lo que el release no incluye -- en
@@ -87,10 +87,10 @@ install_application() {
     # .env.prod.example; .env.prod es generado localmente por
     # generate_env_file, que ya tiene su propio chequeo de "no regenerar si
     # ya existe" mas abajo) ni los volumenes de Docker.
-    log_info "Sincronizando aplicación en /opt/lics..."
-    mkdir -p /opt/lics
-    cp -a "${RELEASE_DIR}/app/." /opt/lics/
-    chmod 750 /opt/lics/scripts/*.sh /opt/lics/scripts/lib/common.sh
+    log_info "Sincronizando aplicación en /opt/sigeda..."
+    mkdir -p /opt/sigeda
+    cp -a "${RELEASE_DIR}/app/." /opt/sigeda/
+    chmod 750 /opt/sigeda/scripts/*.sh /opt/sigeda/scripts/lib/common.sh
 
     log_ok "Aplicación sincronizada (no se tocó .env.prod ni datos de PostgreSQL)."
 }
@@ -115,30 +115,30 @@ load_images() {
 }
 
 generate_env_file() {
-    local env_file="/opt/lics/infra/docker/.env.prod"
+    local env_file="/opt/sigeda/infra/docker/.env.prod"
     local version
 
-    version="$(tr -d '[:space:]' < /opt/lics/VERSION)"
+    version="$(tr -d '[:space:]' < /opt/sigeda/VERSION)"
 
     # Ojo: NO saltarse esto por completo si .env.prod ya existe. Reconstruir
-    # la imagen dorada reutilizando una distro lics-build ya aprovisionada
-    # (caso real de uso, ver install_application) dejaba antes LICS_VERSION
+    # la imagen dorada reutilizando una distro sigeda-build ya aprovisionada
+    # (caso real de uso, ver install_application) dejaba antes SIGEDA_VERSION
     # pegado en la version de la PRIMERA vez que se genero este archivo en
-    # esa distro -- compose.prod.yml usa LICS_VERSION como tag de imagen
-    # (image: lics-backend:${LICS_VERSION}), asi que el compose terminaba
+    # esa distro -- compose.prod.yml usa SIGEDA_VERSION como tag de imagen
+    # (image: sigeda-backend:${SIGEDA_VERSION}), asi que el compose terminaba
     # levantando una imagen vieja aunque install_application y load_images
     # si hubieran actualizado el codigo y cargado las imagenes nuevas. Se
     # actualiza solo la linea de version y se dejan los secretos (password
     # de postgres, secret key de Django) intactos.
     if [[ -f "${env_file}" ]]; then
-        sed -i "s|^LICS_VERSION=.*|LICS_VERSION=${version}|" "${env_file}"
-        log_ok ".env.prod ya existia, se actualizo LICS_VERSION a ${version} (secretos sin tocar)."
+        sed -i "s|^SIGEDA_VERSION=.*|SIGEDA_VERSION=${version}|" "${env_file}"
+        log_ok ".env.prod ya existia, se actualizo SIGEDA_VERSION a ${version} (secretos sin tocar)."
         return
     fi
 
-    cp /opt/lics/infra/docker/.env.prod.example "${env_file}"
+    cp /opt/sigeda/infra/docker/.env.prod.example "${env_file}"
 
-    sed -i "s|^LICS_VERSION=.*|LICS_VERSION=${version}|" "${env_file}"
+    sed -i "s|^SIGEDA_VERSION=.*|SIGEDA_VERSION=${version}|" "${env_file}"
     sed -i "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=$(openssl rand -hex 32)|" "${env_file}"
     sed -i "s|^DJANGO_SECRET_KEY=.*|DJANGO_SECRET_KEY=$(openssl rand -hex 32)|" "${env_file}"
 
@@ -152,8 +152,8 @@ generate_env_file() {
 }
 
 run_initial_migrations() {
-    local compose_file="/opt/lics/infra/docker/compose.prod.yml"
-    local env_file="/opt/lics/infra/docker/.env.prod"
+    local compose_file="/opt/sigeda/infra/docker/compose.prod.yml"
+    local env_file="/opt/sigeda/infra/docker/.env.prod"
     local status=""
 
     if docker compose --env-file "${env_file}" -f "${compose_file}" exec -T postgres true 2>/dev/null; then
@@ -185,7 +185,7 @@ run_initial_migrations() {
 }
 
 create_initial_admin() {
-    # No hay auto-registro en LICS a proposito (ver docs de seguridad): la
+    # No hay auto-registro en SIGEDA a proposito (ver docs de seguridad): la
     # primera cuenta siempre fue un paso manual documentado. Esto lo
     # automatiza generando un administrador con contraseña aleatoria en
     # cada build de la imagen dorada, en vez de una contraseña fija
@@ -194,9 +194,9 @@ create_initial_admin() {
     # la propia imagen y tambien impresa en este log -- debe cambiarse en
     # el primer inicio de sesion. Idempotente: si el archivo ya existe, no
     # se crea otro administrador (ni se pisa la contraseña ya entregada).
-    local compose_file="/opt/lics/infra/docker/compose.prod.yml"
-    local env_file="/opt/lics/infra/docker/.env.prod"
-    local creds_file="/opt/lics/ADMIN_CREDENTIALS_INICIALES.txt"
+    local compose_file="/opt/sigeda/infra/docker/compose.prod.yml"
+    local env_file="/opt/sigeda/infra/docker/.env.prod"
+    local creds_file="/opt/sigeda/ADMIN_CREDENTIALS_INICIALES.txt"
     local admin_password
 
     if [[ -f "${creds_file}" ]]; then
@@ -225,7 +225,7 @@ create_initial_admin() {
         python src/manage.py createsuperuser --noinput
 
     cat > "${creds_file}" <<EOF
-LICS - Administrador inicial, generado automáticamente al construir esta
+SIGEDA - Administrador inicial, generado automáticamente al construir esta
 imagen dorada.
 
 Usuario: admin
@@ -238,7 +238,7 @@ esta contraseña hasta que se cambie -- cada build nueva genera una
 contraseña distinta.
 
 Este archivo solo lo puede leer root. Para volver a verlo:
-  wsl -d lics-wsl -- sudo cat /opt/lics/ADMIN_CREDENTIALS_INICIALES.txt
+  wsl -d sigeda-wsl -- sudo cat /opt/sigeda/ADMIN_CREDENTIALS_INICIALES.txt
 EOF
     chmod 600 "${creds_file}"
 
@@ -252,18 +252,18 @@ EOF
 }
 
 install_systemd_units() {
-    log_info "Instalando lics.service, lics-backup.timer y lics-watchdog.timer (sin modificar)..."
+    log_info "Instalando sigeda.service, sigeda-backup.timer y sigeda-watchdog.timer (sin modificar)..."
 
-    /opt/lics/scripts/install-systemd.sh
-    /opt/lics/scripts/install-backup-timer.sh
-    /opt/lics/scripts/install-watchdog-timer.sh
+    /opt/sigeda/scripts/install-systemd.sh
+    /opt/sigeda/scripts/install-backup-timer.sh
+    /opt/sigeda/scripts/install-watchdog-timer.sh
 
     log_ok "Unidades systemd instaladas y habilitadas."
 }
 
 disable_wsl_pro_service() {
     # wsl-pro.service (agente de Ubuntu Pro) viene habilitado por defecto en
-    # las imagenes de Ubuntu para WSL y no lo usa LICS para nada. En una
+    # las imagenes de Ubuntu para WSL y no lo usa SIGEDA para nada. En una
     # maquina real entro en crash-loop cada ~2 segundos porque no puede
     # invocar interop hacia Windows (con appendWindowsPath=false en
     # wsl.conf), generando ruido constante en el journal. Se enmascara
@@ -273,7 +273,7 @@ disable_wsl_pro_service() {
         return
     fi
 
-    log_info "Deshabilitando wsl-pro.service (no lo usa LICS, causaba crash-loop)..."
+    log_info "Deshabilitando wsl-pro.service (no lo usa SIGEDA, causaba crash-loop)..."
     systemctl disable --now wsl-pro.service >/dev/null 2>&1 || true
     systemctl mask wsl-pro.service >/dev/null 2>&1 || true
     log_ok "wsl-pro.service enmascarado."
@@ -281,10 +281,10 @@ disable_wsl_pro_service() {
 
 validate_start_and_health() {
     log_info "Validando start.sh tal cual está, sin modificaciones..."
-    /opt/lics/scripts/start.sh
+    /opt/sigeda/scripts/start.sh
 
     log_info "Validando healthcheck.sh tal cual está..."
-    /opt/lics/scripts/healthcheck.sh
+    /opt/sigeda/scripts/healthcheck.sh
 
     log_ok "start.sh y healthcheck.sh funcionan sin cambios dentro de WSL2."
 }

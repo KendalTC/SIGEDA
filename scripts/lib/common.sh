@@ -17,9 +17,9 @@ set -Eeuo pipefail
 COMMON_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${COMMON_DIR}/../.." && pwd)"
 
-COMPOSE_FILE="${LICS_COMPOSE_FILE:-${PROJECT_ROOT}/infra/docker/compose.prod.yml}"
-ENV_FILE="${LICS_ENV_FILE:-${PROJECT_ROOT}/infra/docker/.env.prod}"
-BACKUP_ROOT="${LICS_BACKUP_DIR:-${PROJECT_ROOT}/backups}"
+COMPOSE_FILE="${SIGEDA_COMPOSE_FILE:-${PROJECT_ROOT}/infra/docker/compose.prod.yml}"
+ENV_FILE="${SIGEDA_ENV_FILE:-${PROJECT_ROOT}/infra/docker/.env.prod}"
+BACKUP_ROOT="${SIGEDA_BACKUP_DIR:-${PROJECT_ROOT}/backups}"
 
 readonly COMMON_DIR
 readonly PROJECT_ROOT
@@ -106,7 +106,7 @@ validate_environment_file() {
         die "El archivo de entorno todavía contiene valores de ejemplo."
     fi
 
-    require_env_key "LICS_VERSION"
+    require_env_key "SIGEDA_VERSION"
     require_env_key "POSTGRES_DB"
     require_env_key "POSTGRES_USER"
     require_env_key "POSTGRES_PASSWORD"
@@ -287,7 +287,7 @@ wait_for_all_services() {
     # servicios, no el timeout de cada uno por separado. Antes cada llamada
     # a wait_for_service recibía el timeout completo, así que el peor caso
     # real era timeout_seconds x 4 (720s con el default de 180s) -- eso
-    # supera el TimeoutStartSec=300 de infra/systemd/lics.service, que mata
+    # supera el TimeoutStartSec=300 de infra/systemd/sigeda.service, que mata
     # el script a mitad de camino sin que llegue a loguear su propio error
     # (systemd manda SIGTERM/SIGKILL, no es una falla de comando que el
     # trap ERR pueda capturar). Con presupuesto compartido, el peor caso
@@ -320,7 +320,7 @@ wait_for_all_services() {
 # -----------------------------------------------------------------------------
 
 installed_version() {
-    env_value "LICS_VERSION"
+    env_value "SIGEDA_VERSION"
 }
 
 configured_http_port() {

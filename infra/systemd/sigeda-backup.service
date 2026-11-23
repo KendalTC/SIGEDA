@@ -1,0 +1,9 @@
+[Unit]
+Description=SIGEDA automatic backup (RF-16/ADR-03: base + almacén de documentos, cifrado, verificado con SHA-256)
+Requires=docker.service
+After=docker.service sigeda.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/sigeda
+ExecStart=/usr/bin/docker compose -f /opt/sigeda/infra/docker/compose.prod.yml exec -T backend python src/manage.py respaldar automatico

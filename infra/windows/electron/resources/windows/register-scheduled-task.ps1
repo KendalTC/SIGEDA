@@ -1,13 +1,13 @@
 # Registra (de forma idempotente) dos tareas programadas para la distro WSL2
-# de LICS, disparadas cuando cualquier usuario inicia sesión en esta
+# de SIGEDA, disparadas cuando cualquier usuario inicia sesión en esta
 # computadora.
 #
-# 1. "LICS - Iniciar backend": corre start.sh una vez, para que los
-#    servicios (y los respaldos automáticos, vía lics-backup.timer con
+# 1. "SIGEDA - Iniciar backend": corre start.sh una vez, para que los
+#    servicios (y los respaldos automáticos, vía sigeda-backup.timer con
 #    Persistent=true dentro de la distro) estén listos sin esperar a que
 #    alguien abra la app.
 #
-# 2. "LICS - Mantener sesion WSL activa": mantiene un proceso wsl.exe
+# 2. "SIGEDA - Mantener sesion WSL activa": mantiene un proceso wsl.exe
 #    conectado a la distro de forma indefinida (sleep infinity adentro). Sin
 #    esto, en validación real se confirmó que WSL2 apaga la distro completa
 #    (systemd, Docker, todo) segundos después de terminar de arrancar
@@ -44,9 +44,9 @@
 # Scheduler -- ese sigue configurado igual, como red de seguridad adicional
 # por si el wrapper mismo muere.
 #
-# SEGUNDA RONDA (18/08/2026): "LICS - Mantener sesion WSL activa" quedó
+# SEGUNDA RONDA (18/08/2026): "SIGEDA - Mantener sesion WSL activa" quedó
 # confirmada realmente invisible (verificado en validación real: proceso
-# corriendo, sin ninguna ventana). "LICS - Iniciar backend", con el mismo
+# corriendo, sin ninguna ventana). "SIGEDA - Iniciar backend", con el mismo
 # wrapper Start-Process -WindowStyle Hidden, SÍ aparecía -- minimizada,
 # en negro, sin poder usarse -- al iniciar sesión. Causa real: -WindowStyle
 # Hidden en Start-Process oculta la ventana DESPUÉS de creada
@@ -65,16 +65,16 @@
 
 $ErrorActionPreference = 'Stop'
 
-$Distro = 'lics-wsl'
+$Distro = 'sigeda-wsl'
 $WslExe = Join-Path $env:WINDIR 'System32\wsl.exe'
 $PowerShellExe = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
 
 function Write-Log {
     param([string]$Message)
-    Write-Host "[LICS-WSL] $Message"
+    Write-Host "[SIGEDA-WSL] $Message"
 }
 
-function Register-LicsTask {
+function Register-SigedaTask {
     param(
         [Parameter(Mandatory = $true)][string]$TaskName,
         [Parameter(Mandatory = $true)][string]$WslArgument,
@@ -164,13 +164,13 @@ function Register-LicsTask {
     Write-Log "Tarea programada '$TaskName' registrada (dispara con el inicio de sesion de cualquier usuario, sin ventana visible)."
 }
 
-Register-LicsTask `
-    -TaskName 'LICS - Iniciar backend' `
-    -WslArgument "-d $Distro -- /opt/lics/scripts/start.sh" `
-    -Description 'Arranca los servicios de LICS (Docker dentro de WSL2) cuando cualquier usuario inicia sesion en esta computadora, para que los respaldos automaticos y la app esten listos sin esperar.'
+Register-SigedaTask `
+    -TaskName 'SIGEDA - Iniciar backend' `
+    -WslArgument "-d $Distro -- /opt/sigeda/scripts/start.sh" `
+    -Description 'Arranca los servicios de SIGEDA (Docker dentro de WSL2) cuando cualquier usuario inicia sesion en esta computadora, para que los respaldos automaticos y la app esten listos sin esperar.'
 
-Register-LicsTask `
-    -TaskName 'LICS - Mantener sesion WSL activa' `
+Register-SigedaTask `
+    -TaskName 'SIGEDA - Mantener sesion WSL activa' `
     -WslArgument "-d $Distro -- sleep infinity" `
     -Description 'Mantiene una sesion wsl.exe conectada a la distro de forma indefinida, sin ventana visible, para evitar que WSL2 la apague por quedarse sin clientes conectados (ver infra/windows/README.md, seccion Problema conocido).' `
     -KeepAlive

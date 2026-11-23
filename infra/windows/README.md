@@ -1,7 +1,7 @@
-# LICS para Windows — app de escritorio (sin modo kiosco)
+# SIGEDA para Windows — app de escritorio (sin modo kiosco)
 
 Es la propuesta para que un colaborador instale un `.exe`, le aparezca un
-ícono de "LICS" en el escritorio, lo abra como abriría Word o Excel, y quede
+ícono de "SIGEDA" en el escritorio, lo abra como abriría Word o Excel, y quede
 funcionando — sin terminal, sin navegador aparte, sin modo kiosco (la misma
 computadora también se usa para Office).
 
@@ -26,18 +26,18 @@ Motor: **WSL2 + Ubuntu con Docker Engine real dentro**, no Docker Desktop.
 Los scripts de `scripts/*.sh` de este repo se instalan sin cambios dentro de
 esa distro. Lo único nuevo es la capa Windows: un instalador que prepara
 WSL2, y una app de escritorio (Electron) que arranca/verifica los servicios
-y muestra la interfaz web de LICS dentro de su propia ventana nativa.
+y muestra la interfaz web de SIGEDA dentro de su propia ventana nativa.
 
 Sin modo kiosco: la ventana es una ventana normal de Windows (con su barra de
 título, se puede minimizar, mover, cerrar). Cerrarla **no apaga los
 servicios** — Docker y PostgreSQL siguen corriendo dentro de WSL2 igual que
 si cerrás Word y tu computadora sigue prendida. Volver a abrir el ícono de
-LICS solo reconecta con lo que ya está corriendo (rápido) o lo arranca si
+SIGEDA solo reconecta con lo que ya está corriendo (rápido) o lo arranca si
 hacía falta (más lento, con una pantalla de "Iniciando…").
 
 Respaldo automático aunque apaguen la compu de noche: no hace falta inventar
 nada nuevo del lado Windows para esto. El timer que ya existe en
-`infra/systemd/lics-backup.timer` tiene `Persistent=true`, que es exactamente
+`infra/systemd/sigeda-backup.timer` tiene `Persistent=true`, que es exactamente
 la semántica de systemd para "si la máquina estaba apagada a la hora
 programada, ejecutar en cuanto vuelva a estar disponible". Como ese timer
 corre *dentro* de WSL2 sin modificarse, este comportamiento ya viene gratis.
@@ -46,11 +46,11 @@ efectivamente arranque cada vez que la computadora se enciende — de eso se
 encarga la tarea programada `register-scheduled-task.ps1` de más abajo.
 
 Qué NO quedó expuesto como botón en la app: `restore.sh` y `rollback.sh`.
-Esos scripts piden confirmación escrita a propósito (escribir `RESTORE lics`
+Esos scripts piden confirmación escrita a propósito (escribir `RESTORE sigeda`
 a mano) porque son operaciones destructivas — automatizarlas detrás de un
 botón le quita el propósito a esa protección. Siguen siendo procedimientos
 manuales por SSH, igual que hoy. `update.sh` es la excepción: sí se expone
-como botón (menú **LICS > Actualizar aplicación (Django/Next)…**, ver más
+como botón (menú **SIGEDA > Actualizar aplicación (Django/Next)…**, ver más
 abajo), porque es la única vía real para llevar cambios de Django/Next a una
 instalación existente y pide confirmación explícita antes de correr. La app
 expone además lo que ya es seguro repetir sin supervisión: iniciar,
@@ -72,11 +72,11 @@ medio. Pero cada lado sí es un solo comando:
 ./scripts/build-offline-release.sh
 ```
 
-Genera `release/lics-<versión>-linux-amd64/`. Pasá esa carpeta a la Windows
+Genera `release/sigeda-<versión>-linux-amd64/`. Pasá esa carpeta a la Windows
 (USB, red, lo que uses — no hay puente automático entre las dos máquinas para
 este paso).
 
-**En esta Windows**, con la carpeta de release ya copiada a `C:\lics-dev\`:
+**En esta Windows**, con la carpeta de release ya copiada a `C:\sigeda-dev\`:
 
 ```powershell
 cd wsl
@@ -84,7 +84,7 @@ cd wsl
 ```
 
 `cut-release.ps1` detecta sola la carpeta de release más nueva en
-`C:\lics-dev\`, reconstruye la imagen dorada (`build-golden-image.ps1` por
+`C:\sigeda-dev\`, reconstruye la imagen dorada (`build-golden-image.ps1` por
 dentro) y, si tenés `gh` (GitHub CLI) instalado y logueado, dispara el
 workflow de Actions y se queda esperando hasta que el `.exe` esté listo. Sin
 `gh`, hace igual la imagen dorada y te avisa que falta apretar "Run workflow"
@@ -96,8 +96,8 @@ script de fondo y se puede invocar directo:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File wsl\build-golden-image.ps1 `
-    -ReleaseDir "C:\ruta\a\lics-1.0.2-beta-linux-amd64" `
-    -OutputPath "C:\lics-build\lics-wsl-rootfs.tar"
+    -ReleaseDir "C:\ruta\a\sigeda-1.0.2-beta-linux-amd64" `
+    -OutputPath "C:\sigeda-build\sigeda-wsl-rootfs.tar"
 ```
 
 No usa `wsl --install` (ese camino puede abrir un asistente interactivo de
@@ -112,8 +112,8 @@ falta) → descarga e importa Ubuntu 24.04 sin asistente → activa `systemd` y
 usuario `root` por defecto dentro de la distro (reinicia solo la distro, eso
 es instantáneo, no es el reinicio de Windows) → corre
 `provision-golden-image.sh` (Docker Engine, copia la app, carga imágenes,
-`.env.prod`, migraciones, instala `lics.service`/`lics-backup.timer`/
-`lics-watchdog.timer` **sin tocar los dos primeros**, enmascara
+`.env.prod`, migraciones, instala `sigeda.service`/`sigeda-backup.timer`/
+`sigeda-watchdog.timer` **sin tocar los dos primeros**, enmascara
 `wsl-pro.service` — ver más abajo por qué —, valida `start.sh`/
 `healthcheck.sh` tal cual están) → exporta el `.tar` final.
 
@@ -126,10 +126,10 @@ a mano, una vez, antes de correr el script.
 Con el `.tar` ya generado, dejalo en:
 
 ```
-C:\lics-build\lics-wsl-rootfs.tar
+C:\sigeda-build\sigeda-wsl-rootfs.tar
 ```
 
-(ya está listo `electron/build/icon.ico`, un placeholder con el nombre LICS —
+(ya está listo `electron/build/icon.ico`, un placeholder con el nombre SIGEDA —
 reemplazalo cuando tengan un logo real).
 
 ### El runtime de WSL2 también va adentro del `.exe`
@@ -150,13 +150,13 @@ tiene que viajar dentro del instalador. Descargalo una vez de
 (el asset `wsl.<version>.x64.msi`, ~250 MB) y dejalo al lado del `.tar`:
 
 ```
-C:\lics-build\wsl.2.7.14.0.x64.msi
+C:\sigeda-build\wsl.2.7.14.0.x64.msi
 ```
 
 El workflow lo copia a `resources\windows\` en cada corrida, igual que el
 `.tar`, y `install-wsl-distro.ps1` lo instala con `msiexec /qn` solo si
 detecta que el runtime falta. Tiene que haber **exactamente un** `wsl.*.x64.msi`
-en `C:\lics-build`; si hay cero o más de uno, el workflow falla a propósito
+en `C:\sigeda-build`; si hay cero o más de uno, el workflow falla a propósito
 antes de compilar.
 
 Ninguno de los dos archivos va a git (ver `.gitignore`).
@@ -179,7 +179,7 @@ Una sola vez, en esa Windows: **Settings > Actions > Runners > New
 self-hosted runner > Windows**, en tu repo de GitHub. Copiá y corré tal cual
 los comandos que GitHub te genera ahí (traen un token único por repo, no los
 copies de acá porque van a estar vencidos). Cuando `config.cmd` te pregunte
-por labels adicionales, agregá `lics-windows`. Al final, en vez de correrlo
+por labels adicionales, agregá `sigeda-windows`. Al final, en vez de correrlo
 interactivo, instalalo como servicio de Windows para que quede siempre
 disponible:
 
@@ -192,7 +192,7 @@ Con el runner ya registrado y corriendo, agregá
 `.github/workflows/build-windows-installer.yml` (ya te lo dejé armado en el
 zip, en la raíz del repo, no dentro de `infra/windows/`). Cada vez que saques
 una versión nueva: pestaña **Actions > build-windows-installer > Run
-workflow**, y descargá `LICS-Setup` de los artefactos cuando termine.
+workflow**, y descargá `SIGEDA-Setup` de los artefactos cuando termine.
 
 Ojo, dos cosas:
 
@@ -213,13 +213,13 @@ Ojo, dos cosas:
 
 ## Instalación y primer uso (repetir en cada instalación nueva)
 
-Con el `.exe` (artefacto `LICS-Setup` de Actions) ya en la máquina destino:
+Con el `.exe` (artefacto `SIGEDA-Setup` de Actions) ya en la máquina destino:
 
-1. Correr el instalador. El NSIS importa la distro `lics-wsl` desde el
+1. Correr el instalador. El NSIS importa la distro `sigeda-wsl` desde el
    `.tar` embebido y registra las tareas programadas de inicio
    (`register-scheduled-task.ps1`: arranque de servicios y mantener sesión
    WSL activa).
-2. Abrir el ícono "LICS" del escritorio. Primera vez: pantalla de
+2. Abrir el ícono "SIGEDA" del escritorio. Primera vez: pantalla de
    "Iniciando…" mientras arrancan Docker/PostgreSQL/backend/frontend/nginx
    dentro de WSL2; las siguientes veces, si ya estaban corriendo, es casi
    instantáneo.
@@ -228,7 +228,7 @@ Con el `.exe` (artefacto `LICS-Setup` de Actions) ya en la máquina destino:
    contraseña aleatoria al construir la imagen dorada (distinta en cada
    build). Para verla:
    ```powershell
-   wsl -d lics-wsl -- sudo cat /opt/lics/ADMIN_CREDENTIALS_INICIALES.txt
+   wsl -d sigeda-wsl -- sudo cat /opt/sigeda/ADMIN_CREDENTIALS_INICIALES.txt
    ```
 4. **Cambiar esa contraseña de inmediato** desde dentro de la app (o crear
    un usuario administrador propio y desactivar este). Todas las
@@ -240,9 +240,9 @@ Con el `.exe` (artefacto `LICS-Setup` de Actions) ya en la máquina destino:
 ## Actualizar la aplicación (Django/Next) en una instalación existente
 
 Importante, porque no es obvio: **volver a correr el `.exe` en una máquina
-que ya tiene LICS instalado no actualiza el backend ni el frontend.**
+que ya tiene SIGEDA instalado no actualiza el backend ni el frontend.**
 `install-wsl-distro.ps1` se salta a propósito la reimportación del `.tar`
-si la distro `lics-wsl` ya existe (para no perder la base de datos ni los
+si la distro `sigeda-wsl` ya existe (para no perder la base de datos ni los
 respaldos), así que la imagen dorada nueva nunca llega a una instalación
 existente por esa vía — solo sirve para instalaciones limpias en máquinas
 nuevas. Reinstalar el `.exe` sobre una instalación existente solo actualiza
@@ -250,30 +250,30 @@ los archivos del lado Windows (la app Electron: `main.js`, el menú, fixes
 como el de foco), nunca lo que corre dentro de WSL2.
 
 Para actualizar Django/Next en una instalación existente, sin perder datos,
-usar el menú **LICS > Actualizar aplicación (Django/Next)…**. Requisitos y
+usar el menú **SIGEDA > Actualizar aplicación (Django/Next)…**. Requisitos y
 comportamiento:
 
 1. Generar un release offline nuevo en el Mac (`./scripts/build-offline-release.sh`,
    igual que para una imagen dorada) y copiar la carpeta resultante
-   (`lics-<versión>-linux-amd64/`, con `app\` e `images\` adentro) a
-   `C:\lics-dev\` en esta Windows — el mismo lugar que ya se usa para
+   (`sigeda-<versión>-linux-amd64/`, con `app\` e `images\` adentro) a
+   `C:\sigeda-dev\` en esta Windows — el mismo lugar que ya se usa para
    `cut-release.ps1`. Si hay varias carpetas ahí, se usa la más nueva por
    fecha de modificación.
-2. Abrir el menú **LICS > Actualizar aplicación (Django/Next)…**. Aparece
+2. Abrir el menú **SIGEDA > Actualizar aplicación (Django/Next)…**. Aparece
    una confirmación explícita antes de tocar nada (no es automático ni se
    dispara solo).
 3. Al confirmar, corre `infra/windows/electron/resources/windows/update-application.sh`
-   dentro de la distro `lics-wsl` ya viva, que a su vez invoca el
+   dentro de la distro `sigeda-wsl` ya viva, que a su vez invoca el
    actualizador oficial (`scripts/update.sh`, ya existía, nunca se expuso
    antes desde Windows): verifica checksums del paquete, exige que la
    instalación actual esté saludable, hace un **respaldo obligatorio**
    antes de tocar nada, detiene los servicios, carga las 4 imágenes
-   Docker nuevas, reemplaza `/opt/lics` (conservando `.env.prod` y el
+   Docker nuevas, reemplaza `/opt/sigeda` (conservando `.env.prod` y el
    historial de respaldos), corre migraciones y `setup_roles`, vuelve a
    levantar todo y termina con un healthcheck final. Puede tardar varios
    minutos.
 4. Se conserva una copia completa de la instalación anterior en
-   `/opt/lics.previous.<timestamp>` dentro de la distro. **No hay rollback
+   `/opt/sigeda.previous.<timestamp>` dentro de la distro. **No hay rollback
    automático** — si algo falla a mitad de camino, hay que revisar a mano
    (ver `docs/troubleshooting.md`, sección "Windows: 'Actualizar
    aplicación' falla").
@@ -299,7 +299,7 @@ sistema local"). Investigación larga, en tres rondas — las primeras dos
 llegaron a causas parciales/insuficientes, la tercera encontró la causa
 raíz real y se confirmó resuelta con uso extendido real.
 
-**Causa raíz confirmada:** WSL2 apagaba la distro `lics-wsl` completa
+**Causa raíz confirmada:** WSL2 apagaba la distro `sigeda-wsl` completa
 (`systemd`, Docker, todo — no solo un contenedor) unos segundos después de
 terminar de arrancar, **cuando no quedaba ningún proceso `wsl.exe`
 conectado como cliente**. `systemd=true` en `wsl.conf` (correctamente
@@ -310,12 +310,12 @@ del apagado: `systemd-logind: The system will power off now!` seguido de
 un `poweroff.target` completo, siempre 2 segundos después de que systemd
 terminaba de arrancar — un patrón sistemático, no aleatorio. La única tarea
 programada que arrancaba la distro (`register-scheduled-task.ps1`) corría
-`wsl -d lics-wsl -- start.sh` y **terminaba en cuanto `start.sh`
+`wsl -d sigeda-wsl -- start.sh` y **terminaba en cuanto `start.sh`
 terminaba**, sin dejar ningún cliente conectado detrás.
 
 **Fix aplicado:** `register-scheduled-task.ps1` ahora registra una segunda
-tarea programada, "LICS - Mantener sesion WSL activa", que corre `wsl -d
-lics-wsl -- sleep infinity` de forma indefinida (con
+tarea programada, "SIGEDA - Mantener sesion WSL activa", que corre `wsl -d
+sigeda-wsl -- sleep infinity` de forma indefinida (con
 `ExecutionTimeLimit=0` para que Task Scheduler no la mate a los 3 días, y
 reinicio automático si el proceso muere igual). Mientras ese proceso esté
 vivo, WSL2 nunca ve la distro sin clientes y no la apaga. Confirmado con
@@ -335,7 +335,7 @@ ventana del proceso lanzado** — solo oculta la tarea de la lista del
 Programador de Tareas (confirmado contra la documentación oficial de
 Microsoft, `ITaskSettings::put_Hidden`). La tarea corre en la sesión
 interactiva del usuario (necesario para funcionar con cualquier usuario
-que inicie sesión, sin guardar contraseña), así que `wsl.exe -d lics-wsl
+que inicie sesión, sin guardar contraseña), así que `wsl.exe -d sigeda-wsl
 -- sleep infinity` sí abría una ventana de consola real — indistinguible a
 simple vista de cualquier otra terminal abierta. Cerrarla por error mataba
 el proceso exactamente como cerrar cualquier `cmd`/`powershell` a mano.
@@ -362,7 +362,7 @@ una instalación existente que todavía no recibió este fix, la mitigación
 inmediata mientras tanto es relanzar la tarea a mano:
 
 ```powershell
-Start-ScheduledTask -TaskName 'LICS - Mantener sesion WSL activa'
+Start-ScheduledTask -TaskName 'SIGEDA - Mantener sesion WSL activa'
 ```
 
 **No probado con uso real extendido todavía** (a diferencia del fix
@@ -371,8 +371,8 @@ validada por revisión de código y contra la documentación oficial de
 Microsoft, pendiente de confirmar con tiempo real corriendo sin que nadie
 la mate por accidente.
 
-**Tercera ronda (18/08/2026): "LICS - Iniciar backend" seguía mostrando
-una ventana, aunque "LICS - Mantener sesion WSL activa" ya estaba
+**Tercera ronda (18/08/2026): "SIGEDA - Iniciar backend" seguía mostrando
+una ventana, aunque "SIGEDA - Mantener sesion WSL activa" ya estaba
 confirmada invisible.** Reportado en uso real: al prender la computadora
 se abría una ventana minimizada, en negro, que no se podía usar —
 distinta del bug original (esta no mataba el proceso al cerrarla, así que
@@ -404,7 +404,7 @@ con un reinicio real de la máquina.
 **Causas insuficientes investigadas antes de llegar a esta** (documentadas
 para no repetir el camino si algo similar reaparece):
 
-- Exclusión de Windows Defender sobre `C:\ProgramData\LICS\wsl` — se
+- Exclusión de Windows Defender sobre `C:\ProgramData\SIGEDA\wsl` — se
   encontró que faltaba (`Get-MpPreference -ExclusionPath` vacío) y se
   agregó (a mano y automatizada en `install-wsl-distro.ps1`/
   `build-golden-image.ps1`), pero el síntoma siguió pasando igual con la
@@ -421,7 +421,7 @@ investigación:** cuando la distro se reinicia, `backend`, `frontend` y
 `backend`/`frontend` ya estén resueltos por DNS (`depends_on: condition:
 service_healthy` en `compose.prod.yml`), y esa lógica de orden es de
 `docker compose`, no del daemon crudo. `wsl-pro.service` (agente de Ubuntu
-Pro, viene de fábrica, LICS no lo usa) estaba en crash-loop por un problema
+Pro, viene de fábrica, SIGEDA no lo usa) estaba en crash-loop por un problema
 de interop no relacionado — generaba ruido pero no era la causa; se
 enmascaró de todas formas.
 
@@ -435,7 +435,7 @@ hibernación de Windows (cero eventos `Kernel-Power`), crash de Hyper-V
 `--shutdown` ni polling automático), presión de memoria (16GB totales, 6GB
 libres en el momento del corte, sin ajustes de `memory=` en `.wslconfig`).
 
-**Mitigación de red de seguridad, se mantiene igual (`lics-watchdog.timer`):**
+**Mitigación de red de seguridad, se mantiene igual (`sigeda-watchdog.timer`):**
 corre `start.sh` cada 2 minutos dentro de la distro. Como `start.sh` pasa
 por `docker compose up` (que sí respeta `depends_on`), cualquier servicio
 que haya quedado caído por cualquier otra causa se reconcilia solo en
@@ -453,7 +453,7 @@ patrón (arranque + apagado a los pocos segundos) u otro nuevo.
 Reportado en uso real: tras un rato usando la app, los cuadros de texto
 dejaban de aceptar clics aunque la ventana se veía normal y enfocada.
 Cerrar y volver a abrir la app lo arreglaba, y también abrir el menú
-"LICS > Ver estado" (cualquier diálogo nativo).
+"SIGEDA > Ver estado" (cualquier diálogo nativo).
 
 **Causa:** bug conocido de Electron en Windows — la ventana (`BrowserWindow`)
 puede recuperar el foco del sistema operativo (tras alt-tab, un diálogo
@@ -486,7 +486,7 @@ además del handler de `'focus'`, ahora hay un chequeo periódico (cada 1.5s)
 que revisa si la ventana está enfocada a nivel de sistema operativo pero el
 `webContents` no, y en ese caso fuerza el refoco. La condición exige
 `win.isFocused()` primero, para no robarle nunca el foco a otra aplicación
-(Word, Excel) cuando LICS está en segundo plano — importante porque esta
+(Word, Excel) cuando SIGEDA está en segundo plano — importante porque esta
 app no corre en modo kiosco.
 
 **Honestidad sobre el estado real:** esto es una mitigación adicional
@@ -518,20 +518,20 @@ infra/windows/
     main.js                          arranque, ventana normal (no kiosco), menú
     preload.js
     lib/backend.js                   llama wsl.exe hacia los scripts existentes
-    renderer/loading.html            pantalla de "Iniciando LICS..."
+    renderer/loading.html            pantalla de "Iniciando SIGEDA..."
     build/installer.nsh              hooks NSIS: importa la distro durante la instalación
     resources/windows/
       install-wsl-distro.ps1         corre el instalador durante el setup
       register-scheduled-task.ps1    tareas "iniciar backend" + "mantener sesión WSL activa"
-      update-application.sh          corre "LICS > Actualizar aplicación" (ver sección de arriba)
-      (lics-wsl-rootfs.tar va acá, generado en el paso de arriba)
+      update-application.sh          corre "SIGEDA > Actualizar aplicación" (ver sección de arriba)
+      (sigeda-wsl-rootfs.tar va acá, generado en el paso de arriba)
 
 infra/systemd/
-  lics.service / lics-backup.timer   sin modificar, se instalan tal cual dentro de la distro
-  lics-watchdog.service/.timer       nuevo: reconcilia servicios caídos cada 2 min (ver "Problema conocido" arriba)
+  sigeda.service / sigeda-backup.timer   sin modificar, se instalan tal cual dentro de la distro
+  sigeda-watchdog.service/.timer       nuevo: reconcilia servicios caídos cada 2 min (ver "Problema conocido" arriba)
 
 scripts/
-  install-watchdog-timer.sh          instala lics-watchdog.{service,timer}, lo invoca provision-golden-image.sh
+  install-watchdog-timer.sh          instala sigeda-watchdog.{service,timer}, lo invoca provision-golden-image.sh
   update.sh                          actualizador oficial (checksums, respaldo, migraciones); ahora también
                                       invocado desde Windows por update-application.sh, ver arriba
 ```

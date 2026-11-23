@@ -25,7 +25,7 @@ source "${SCRIPT_DIR}/lib/common.sh"
 
 readonly SCRIPT_DIR
 
-STOP_TIMEOUT_SECONDS="${LICS_STOP_TIMEOUT_SECONDS:-60}"
+STOP_TIMEOUT_SECONDS="${SIGEDA_STOP_TIMEOUT_SECONDS:-60}"
 
 service_runtime_status() {
     local service="$1"

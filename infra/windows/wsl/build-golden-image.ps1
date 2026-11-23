@@ -1,6 +1,6 @@
 ﻿<#
 .SYNOPSIS
-    Construye la imagen dorada de WSL2 para LICS de punta a punta, en un solo
+    Construye la imagen dorada de WSL2 para SIGEDA de punta a punta, en un solo
     comando - incluyendo el reinicio de Windows si hace falta habilitar WSL2
     por primera vez.
 
@@ -21,7 +21,7 @@
       3. Activa systemd dentro de la distro (reinicia solo la distro, no
          Windows - es liviano, unos segundos).
       4. Corre provision-golden-image.sh (Docker, la app, imagenes, .env.prod,
-         migraciones, lics.service/lics-backup.timer, y valida start.sh y
+         migraciones, sigeda.service/sigeda-backup.timer, y valida start.sh y
          healthcheck.sh tal cual estan, sin tocarlos).
       5. Exporta la imagen dorada lista para el instalador de Windows.
 
@@ -30,12 +30,12 @@
     generado con scripts/build-offline-release.sh.
 
 .PARAMETER OutputPath
-    Donde dejar el .tar final (ej. C:\lics-build\lics-wsl-rootfs.tar).
+    Donde dejar el .tar final (ej. C:\sigeda-build\sigeda-wsl-rootfs.tar).
 
 .EXAMPLE
     powershell -ExecutionPolicy Bypass -File build-golden-image.ps1 `
-        -ReleaseDir "C:\Users\ale\lics-1.0.2-beta-linux-amd64" `
-        -OutputPath "C:\lics-build\lics-wsl-rootfs.tar"
+        -ReleaseDir "C:\Users\ale\sigeda-1.0.2-beta-linux-amd64" `
+        -OutputPath "C:\sigeda-build\sigeda-wsl-rootfs.tar"
 #>
 
 param(
@@ -46,7 +46,7 @@ param(
     [string]$OutputPath,
 
     # Fuerza una imagen dorada 100% desde cero: desregistra la distro
-    # lics-build existente (si hay) antes de importar de nuevo, en vez de
+    # sigeda-build existente (si hay) antes de importar de nuevo, en vez de
     # reutilizarla. Usar para el primer release de produccion real de un
     # cliente, o cada vez que se sospeche que la distro build acumulo
     # estado de builds anteriores (imagenes Docker viejas, .env.prod viejo,
@@ -62,16 +62,16 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$DistroName = 'lics-build'
-$BuildDir = "$env:ProgramData\LICS\build-distro"
-$StateDir = "$env:ProgramData\LICS\build"
+$DistroName = 'sigeda-build'
+$BuildDir = "$env:ProgramData\SIGEDA\build-distro"
+$StateDir = "$env:ProgramData\SIGEDA\build"
 $StateFile = Join-Path $StateDir 'state.json'
 $RunOnceKey = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\RunOnce'
 $RootfsUrl = 'https://cloud-images.ubuntu.com/wsl/releases/24.04/current/ubuntu-noble-wsl-amd64-wsl.rootfs.tar.gz'
 
 function Write-Log {
     param([string]$Message)
-    Write-Host "[LICS-BUILD] $Message"
+    Write-Host "[SIGEDA-BUILD] $Message"
 }
 
 function Save-State {
@@ -96,7 +96,7 @@ function Register-ResumeAfterReboot {
     $freshFlag = if ($Fresh) { " -Fresh" } else { "" }
     $command = "powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`" -ReleaseDir `"$ReleaseDir`" -OutputPath `"$OutputPath`"$freshFlag -Resume"
     New-Item -Path $RunOnceKey -Force | Out-Null
-    New-ItemProperty -Path $RunOnceKey -Name 'LICSBuildResume' -Value $command -PropertyType String -Force | Out-Null
+    New-ItemProperty -Path $RunOnceKey -Name 'SigedaBuildResume' -Value $command -PropertyType String -Force | Out-Null
     Write-Log "Reanudacion automatica registrada para despues del reinicio."
 }
 
@@ -361,7 +361,7 @@ try {
 
     Remove-Item -Path $StateFile -ErrorAction SilentlyContinue
 
-    Write-Log "LISTO. Copia '$OutputPath' a infra\windows\electron\resources\windows\lics-wsl-rootfs.tar y corre 'npm run dist' dentro de electron\."
+    Write-Log "LISTO. Copia '$OutputPath' a infra\windows\electron\resources\windows\sigeda-wsl-rootfs.tar y corre 'npm run dist' dentro de electron\."
 
 } catch {
     Write-Log "ERROR: $($_.Exception.Message)"

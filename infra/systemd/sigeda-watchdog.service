@@ -1,0 +1,9 @@
+[Unit]
+Description=SIGEDA - Reconciliar servicios productivos (autocuracion)
+Requires=docker.service
+After=docker.service sigeda.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/sigeda
+ExecStart=/opt/sigeda/scripts/start.sh

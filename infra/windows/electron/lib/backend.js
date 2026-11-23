@@ -2,15 +2,20 @@
 
 // Envoltorio delgado sobre wsl.exe. No reimplementa nada de la lógica de
 // negocio: solo invoca, sin modificar, los scripts que ya existen en
-// scripts/*.sh dentro de la distro "lics-wsl". restore.sh y rollback.sh
-// siguen sin exponerse a propósito -- son procedimientos de recuperación
-// peligrosos, distintos a una actualización normal, y siguen siendo
-// manuales por WSL con confirmación escrita. update.sh sí se expone (ver
+// scripts/*.sh dentro de la distro "sigeda-wsl". La restauración real del
+// archivo documental (RF-16) NO es un script: es una funcionalidad de la
+// propia aplicación web de SIGEDA (PAN-08/D-05, apps/respaldos), detrás de
+// sesión iniciada, confirmación escrita y, según el plan vigente, solo
+// disponible para la cuenta Administración -- por eso no hace falta
+// exponerla aquí. rollback.sh (revertir una actualización de código
+// fallida, no un respaldo del archivo) sigue sin exponerse a propósito --
+// es un procedimiento distinto y peligroso, manual por WSL con
+// confirmación escrita. update.sh sí se expone (ver
 // updateApplication más abajo), porque es la única vía real para llevar
 // cambios de Django/Next a una instalación que ya existe: reinstalar el
 // .exe NO alcanza, install-wsl-distro.ps1 se salta la reimportación del
 // .tar si la distro ya existe (para no perder datos), así que la imagen
-// dorada nunca llega a una máquina que ya tiene LICS instalado. La
+// dorada nunca llega a una máquina que ya tiene SIGEDA instalado. La
 // confirmación con el usuario vive en main.js, antes de llamar a esta
 // función.
 
@@ -20,8 +25,8 @@ const fs = require('fs');
 const path = require('path');
 const { app } = require('electron');
 
-const DISTRO = 'lics-wsl';
-const APP_ROOT = '/opt/lics';
+const DISTRO = 'sigeda-wsl';
+const APP_ROOT = '/opt/sigeda';
 const HEALTH_URL = 'http://127.0.0.1/nginx-health';
 const START_TIMEOUT_MS = 3 * 60 * 1000;
 const POLL_INTERVAL_MS = 2000;
@@ -137,7 +142,7 @@ function runScriptFileInDistro(scriptFileName, onLine) {
 }
 
 async function ensureDistroRunning() {
-  // Cualquier comando "wsl -d lics-wsl" arranca la distro si estaba apagada,
+  // Cualquier comando "wsl -d sigeda-wsl" arranca la distro si estaba apagada,
   // así que esto alcanza como comprobación mínima de que WSL2 responde.
   await runInDistro('true');
 }
@@ -163,14 +168,21 @@ function runHealthcheck(onLine) {
 }
 
 function backupNow(onLine) {
-  return runInDistro(`${APP_ROOT}/scripts/backup.sh manual`, onLine);
+  // RF-16/ADR-03: respaldo real (base + almacén de documentos, cifrado
+  // AES-256-GCM, verificado con SHA-256), apps/respaldos del Incremento
+  // 3a -- no el scripts/backup.sh viejo (retirado, solo hacía pg_dump
+  // de la base, sin documentos y sin cifrar).
+  return runInDistro(
+    `docker compose -f ${APP_ROOT}/infra/docker/compose.prod.yml exec -T backend python src/manage.py respaldar manual`,
+    onLine,
+  );
 }
 
 function updateApplication(onLine) {
   // Actualiza Django + Next a la versión nueva dentro de una instalación
   // YA existente, sin tocar la imagen dorada ni el .exe. Requiere que el
   // release offline nuevo (mismo formato que build-offline-release.sh)
-  // ya esté copiado a mano en C:\lics-dev\ en esta máquina Windows -- ver
+  // ya esté copiado a mano en C:\sigeda-dev\ en esta máquina Windows -- ver
   // el comentario largo en resources/windows/update-application.sh y la
   // sección "Actualizar la aplicación" de infra/windows/README.md.
   return runScriptFileInDistro('update-application.sh', onLine);
@@ -199,7 +211,7 @@ function waitHealthy(timeoutMs = START_TIMEOUT_MS) {
 
     const retry = () => {
       if (Date.now() - start >= timeoutMs) {
-        reject(new Error('LICS no respondió a tiempo en ' + HEALTH_URL));
+        reject(new Error('SIGEDA no respondió a tiempo en ' + HEALTH_URL));
         return;
       }
       setTimeout(attempt, POLL_INTERVAL_MS);

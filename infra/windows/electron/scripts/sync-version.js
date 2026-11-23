@@ -3,13 +3,13 @@
 /**
  * Copia la version del archivo VERSION de la raiz del repo al "version" de
  * package.json, que es de donde electron-builder saca el nombre del
- * instalador (LICS Setup <version>.exe) y la version que Windows muestra en
+ * instalador (SIGEDA Setup <version>.exe) y la version que Windows muestra en
  * "Aplicaciones instaladas".
  *
  * VERSION es la unica fuente de verdad de la version del sistema: ya la usan
- * scripts/build-offline-release.sh, scripts/install.sh,
- * scripts/install-preflight.sh y scripts/backup.sh. Este script evita tener
- * que acordarse de subir el numero tambien aca.
+ * scripts/build-offline-release.sh, scripts/install.sh y
+ * scripts/install-preflight.sh. Este script evita tener que acordarse de
+ * subir el numero tambien aca.
  *
  * Corre solo, como hook "predist" de package.json, antes de electron-builder:
  * tanto en el workflow build-windows-installer.yml como en un build local.

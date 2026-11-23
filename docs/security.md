@@ -5,10 +5,9 @@ autorización), adaptado para **SIGEDA**. Los principios, el manejo de
 secretos y la red son los mismos; la sección de control de acceso se
 reescribió porque SIGEDA ya no usa el sistema de roles por módulo de
 negocio de LICS (se retiró al construir SIGEDA — ver
-[CLAUDE.md](../CLAUDE.md)). La sección "Seguridad en Windows" describe
-el despliegue de LICS tal cual sigue en el repositorio
-(`infra/windows/`), conservado como referencia: todavía no es el
-despliegue de SIGEDA, que sigue sin decidirse.
+[CLAUDE.md](../CLAUDE.md)). La sección "Seguridad en Windows" documenta
+el despliegue real de producción de SIGEDA (`infra/windows/`, laptop
+Windows de la ASADA, confirmado el 23/11/2026).
 
 ## Principios
 
@@ -79,7 +78,7 @@ o `/api/system/status/`), no para el dominio de SIGEDA.
   `SALES`, `CUSTOMERS`, `READ_ONLY`) porque el código genérico de administración de usuarios
   los sigue nombrando, pero ya no tienen ningún permiso de módulo asociado.
 
-Las secciones «SSH» y «Operadores» que siguen describen el modelo de seguridad a nivel de sistema operativo pensado originalmente para Linux, heredado de LICS sin cambios. La sección [Seguridad en Windows](#seguridad-en-windows), más abajo, documenta el despliegue de LICS en Windows (`infra/windows/`), que sigue en el repositorio como referencia — SIGEDA todavía no tiene un despliegue de producción propio (ver [Despliegue en Windows](../infra/windows/README.md)).
+Las secciones «SSH» y «Operadores» que siguen describen el modelo de seguridad a nivel de sistema operativo pensado originalmente para Linux, heredado de LICS sin cambios. La sección [Seguridad en Windows](#seguridad-en-windows), más abajo, documenta el despliegue real de producción de SIGEDA en Windows (`infra/windows/`, ver [infra/windows/README.md](../infra/windows/README.md)).
 
 ## SSH
 
@@ -134,18 +133,21 @@ original.
 
 ## Seguridad en Windows
 
-> Esta sección describe el despliegue de **LICS** en Windows, conservado tal
-> cual en `infra/windows/` como referencia. SIGEDA todavía no tiene un
-> despliegue de producción propio — ver [Pendientes principales](../README.md#pendientes-principales).
+> Esta sección describe el despliegue de **SIGEDA** en Windows
+> (`infra/windows/`), confirmado como el despliegue real de producción
+> (laptop Windows de la ASADA) el 23/11/2026. La infraestructura venía de
+> LICS v2.5.0 y se renombró lics→sigeda ese mismo día — ver
+> [Pendientes principales](../README.md#pendientes-principales).
 
 Esta sección toma cada medida de las secciones anteriores (pensadas para
 Linux) y documenta su equivalente real en la arquitectura de producción
-vigente de LICS: WSL2 (Ubuntu 24.04, distro `lics-wsl`) + Docker Engine dentro de
-esa distro + app de escritorio Electron en Windows (ver
-[`infra/windows/README.md`](../infra/windows/README.md) y
-[`docs/windows-desktop-stage-closure.md`](windows-desktop-stage-closure.md)).
-Cada punto está verificado contra el código real, no asumido; donde no se
-encontró un equivalente implementado se marca explícitamente como brecha.
+vigente de SIGEDA: WSL2 (Ubuntu 24.04, distro `sigeda-wsl`) + Docker Engine
+dentro de esa distro + app de escritorio Electron en Windows (ver
+[`infra/windows/README.md`](../infra/windows/README.md), la referencia
+real y validada contra hardware; el documento de cierre de etapa que se
+citaba aquí antes no se conservó en el repositorio). Cada punto está
+verificado contra el código real, no asumido; donde no se encontró un
+equivalente implementado se marca explícitamente como brecha.
 
 ### Red
 
@@ -167,24 +169,23 @@ desvía de esto: `APP_URL` y `HEALTH_URL` (en `main.js` y
 
 No hay ningún servidor SSH ni ningún otro puerto de administración remota
 en todo el flujo Windows/WSL2/Electron — se revisó explícitamente
-(`infra/windows/`, `docs/windows-desktop-stage-closure.md`) y las únicas dos
-menciones a "SSH" en esos archivos son comparaciones de prosa con el modelo
-Linux anterior (`infra/windows/README.md`, sección "Actualizar la
-aplicación"; `docs/windows-desktop-stage-closure.md`, §2), no un mecanismo
-real.
+(`infra/windows/`) y la única mención a "SSH" en esos archivos es una
+comparación de prosa con el modelo Linux anterior
+(`infra/windows/README.md`, sección "Actualizar la aplicación"), no un
+mecanismo real.
 
 Todo el control de la distro se hace exclusivamente invocando `wsl.exe -d
-lics-wsl -- ...` **desde el propio proceso Electron corriendo en esa misma
+sigeda-wsl -- ...` **desde el propio proceso Electron corriendo en esa misma
 máquina Windows** (`spawnInDistro()` en
 `infra/windows/electron/lib/backend.js`), o por una persona físicamente
-frente a esa Windows corriendo `wsl -d lics-wsl` a mano. No existe ninguna
+frente a esa Windows corriendo `wsl -d sigeda-wsl` a mano. No existe ninguna
 vía de red para llegar a ese control — es una mejora real sobre SSH: SSH,
 aun con llaves y firewall (como pide la sección "SSH" de arriba), sigue
 siendo un demonio expuesto a la red que hay que mantener parcheado y
 acotado; acá no hay nada escuchando en la red para administración remota,
 punto.
 
-**Actualizaciones**: el menú **LICS > Actualizar aplicación (Django/Next)…**
+**Actualizaciones**: el menú **SIGEDA > Actualizar aplicación (Django/Next)…**
 (`main.js`) es la única forma de llevar cambios de Django/Next a una
 instalación existente, y exige una confirmación explícita
 (diálogo Cancelar/Actualizar) de alguien sentado frente a esa máquina antes
@@ -196,12 +197,19 @@ acceso de red y la llave correcta podría disparar una actualización sin
 estar presente; acá hace falta estar físicamente en la máquina y confirmar
 el diálogo.
 
-`restore.sh` y `rollback.sh` (los procedimientos destructivos) siguen sin
-exponerse en el menú de Electron, a propósito, igual que en Linux — siguen
-siendo manuales, con confirmación escrita, corriendo dentro de WSL2. La
-diferencia con el modelo Linux es que ahora se invocan localmente (`wsl -d
-lics-wsl -- sudo bash /opt/lics/scripts/restore.sh`) en vez de por SSH: al
-no existir SSH en absoluto, esto es al menos equivalente y, en la práctica,
+**La restauración real del archivo documental (RF-16) no es un script: es
+una funcionalidad de la propia aplicación web de SIGEDA** (PAN-08/D-05,
+`apps/respaldos`), detrás de sesión iniciada, con confirmación escrita y
+exigiendo la contraseña de la cuenta Administración en concreto (ver
+`backend/src/apps/respaldos/sigeda_views.py`), nunca desde el menú de
+Electron ni por una vía de red fuera de la propia app. `rollback.sh`
+(revertir una actualización de código fallida — un procedimiento distinto,
+no un respaldo del archivo documental) sigue sin exponerse en el menú de
+Electron, a propósito, igual que en Linux: sigue siendo manual, con
+confirmación escrita, corriendo dentro de WSL2. La diferencia con el
+modelo Linux es que ahora se invoca localmente (`wsl -d sigeda-wsl --
+sudo bash /opt/sigeda/scripts/rollback.sh`) en vez de por SSH: al no
+existir SSH en absoluto, esto es al menos equivalente y, en la práctica,
 más restrictivo — exige presencia local en la máquina de producción, no
 solo credenciales de red.
 
@@ -216,12 +224,12 @@ Windows.** Verificado en el código, no es un supuesto:
   estación de trabajo interactiva)".
 - `infra/windows/wsl/build-golden-image.ps1` configura `wsl.conf` con
   `[user]` / `default=root` — el usuario por defecto de toda la distro
-  `lics-wsl` es root.
+  `sigeda-wsl` es root.
 - Del lado Windows, las dos tareas programadas que registra
   `register-scheduled-task.ps1` corren con principal `RunLevel Limited`
   (SID `S-1-5-32-545`, `BUILTIN\Users`) disparadas al inicio de sesión de
   **cualquier** usuario de esa Windows — no hay una cuenta Windows
-  dedicada y separada para operar LICS; corre bajo la sesión de quien
+  dedicada y separada para operar SIGEDA; corre bajo la sesión de quien
   inicie sesión en esa computadora.
 
 Esto no es peor que el modelo Linux: era exactamente el mismo pendiente
@@ -229,54 +237,69 @@ documentado más abajo, en "Controles pendientes" ("Usuario operativo del
 sistema operativo", "Usuario técnico separado"), y sigue sin resolverse acá
 tampoco. La migración a Windows no lo empeoró ni lo arregló — lo dejó
 igual de pendiente. Queda como decisión del negocio si vale la pena
-resolverlo dado que LICS sigue siendo una computadora dedicada de un solo
-propósito.
+resolverlo dado que SIGEDA sigue siendo una computadora dedicada de un
+solo propósito.
 
 ### systemd (unidades productivas): sigue siendo la base, no fue reemplazado
 
-`lics.service`, `lics-backup.service`/`.timer` y `lics-watchdog.service`/`.timer`
-**siguen corriendo, sin modificar, dentro de la distro WSL2** — no fueron
-reemplazados por la tarea programada de Windows. `provision-golden-image.sh`
-los instala al construir la imagen dorada
-(`install_systemd_units()`, que llama a `install-systemd.sh`,
-`install-backup-timer.sh` e `install-watchdog-timer.sh`), y funcionan
-porque WSL2 corre un systemd real dentro de la distro (`systemd=true` en
-`wsl.conf`, confirmado en `build-golden-image.ps1`). El respaldo diario
-(`lics-backup.timer`, `OnCalendar=*-*-* 03:00:00`, `Persistent=true`) y el
-watchdog de autocuración (`lics-watchdog.timer`, cada 2 minutos) son
+`sigeda.service`, `sigeda-backup.service`/`.timer` y
+`sigeda-watchdog.service`/`.timer` **siguen corriendo, sin modificar,
+dentro de la distro WSL2** — no fueron reemplazados por la tarea
+programada de Windows. `provision-golden-image.sh` los instala al
+construir la imagen dorada (`install_systemd_units()`, que llama a
+`install-systemd.sh`, `install-backup-timer.sh` e
+`install-watchdog-timer.sh`), y funcionan porque WSL2 corre un systemd
+real dentro de la distro (`systemd=true` en `wsl.conf`, confirmado en
+`build-golden-image.ps1`). El respaldo diario (`sigeda-backup.timer`,
+`OnCalendar=*-*-* 03:00:00`, `Persistent=true`) dispara
+`python src/manage.py respaldar automatico` dentro del contenedor backend
+(RF-16/ADR-03: base + almacén de documentos, cifrado, verificado con
+SHA-256 — corregido el 23/11/2026: antes llamaba a un `scripts/backup.sh`
+retirado, que solo hacía `pg_dump` sin cifrar y sin los documentos) y el
+watchdog de autocuración (`sigeda-watchdog.timer`, cada 2 minutos) son
 exactamente los mismos que en Linux, corriendo por la misma vía.
 
 La tarea programada de Windows (`register-scheduled-task.ps1`) **no
 sustituye** a systemd — resuelve un problema distinto y específico de
 WSL2: por sí sola, WSL2 apaga toda la distro (systemd incluido) segundos
 después de arrancar si ningún proceso `wsl.exe` queda conectado como
-cliente (investigado y confirmado en
-`docs/windows-desktop-stage-closure.md`, §9-10). La tarea "LICS - Iniciar
-backend" solo dispara `start.sh` al iniciar sesión en Windows, y "LICS -
-Mantener sesion WSL activa" mantiene un cliente `wsl.exe` conectado de
-forma indefinida para que WSL2 no apague la distro; el trabajo real
-(arrancar servicios, respaldar, vigilar) lo sigue haciendo systemd adentro,
-sin cambios.
+cliente (ver el comentario de "SEGUNDA RONDA" en
+`register-scheduled-task.ps1` y la sección "Problema conocido" de
+`infra/windows/README.md`). La tarea "SIGEDA - Iniciar backend" solo
+dispara `start.sh` al iniciar sesión en Windows, y "SIGEDA - Mantener
+sesion WSL activa" mantiene un cliente `wsl.exe` conectado de forma
+indefinida para que WSL2 no apague la distro; el trabajo real (arrancar
+servicios, respaldar, vigilar) lo sigue haciendo systemd adentro, sin
+cambios.
 
-Excepción notable: `lics-kiosk.service` (el modo kiosco de Chromium,
-pensado para el plan original de Ubuntu Desktop/Linux Mint) **no se instala
-en ningún lado del flujo Windows** — `install_systemd_units()` no lo
-incluye. Es vestigial en esta arquitectura: la app Electron reemplaza
+El modo kiosco de Chromium (pensado para el plan original de Ubuntu
+Desktop/Linux Mint) se descartó y se retiró del repositorio el
+23/11/2026 (`infra/systemd/lics-kiosk.service` y los scripts
+`start-kiosk.sh`/`install-kiosk.sh`/`install-autologin-gdm.sh`/
+`install-workstation.sh`/`install-desktop-user.sh`): nunca se instaló en
+el flujo Windows (`install_systemd_units()` no lo incluía) y era
+vestigial en esta arquitectura — la app Electron reemplaza
 funcionalmente al modo kiosco (ventana nativa normal, sin Chromium en
 pantalla completa, ver `infra/windows/README.md`, "Decisión de
 arquitectura").
 
 ### Backups y restauración
 
-Sin cambios respecto a Linux: el timer y el servicio de respaldo automático
-corren dentro de WSL2 sin modificarse (ver arriba). La restauración
-(`restore.sh`, `rollback.sh`) sigue siendo manual, con confirmación
-escrita, y ahora se dispara localmente vía `wsl -d lics-wsl` en vez de por
-SSH — nunca desde la interfaz de Electron, nunca por una vía de red. Quien
-puede restaurar es exactamente quien tiene acceso físico/local a esa
-computadora Windows, ni más ni menos que antes; al no existir SSH en este
-modelo, no hay una superficie de red adicional que asegurar para este
-punto en particular.
+El timer y el servicio de respaldo automático corren dentro de WSL2 sin
+modificarse (ver arriba), y desde el 23/11/2026 disparan el mecanismo
+real de SIGEDA (`apps/respaldos`, cifrado AES-256-GCM, verificado con
+SHA-256) en vez del `pg_dump` sin cifrar que usaban antes. La
+restauración del archivo documental (RF-16) es una funcionalidad de la
+propia aplicación web (PAN-08/D-05), detrás de sesión iniciada y
+contraseña de la cuenta Administración — nunca un script, nunca desde la
+interfaz de Electron, nunca por una vía de red fuera de la propia app.
+`rollback.sh` (revertir una actualización de código fallida, procedimiento
+distinto) sigue siendo manual, con confirmación escrita, y se dispara
+localmente vía `wsl -d sigeda-wsl` en vez de por SSH — nunca desde la
+interfaz de Electron, nunca por una vía de red. Quien puede ejecutarlo es
+exactamente quien tiene acceso físico/local a esa computadora Windows; al
+no existir SSH en este modelo, no hay una superficie de red adicional que
+asegurar para este punto en particular.
 
 ## Controles implementados actualmente
 

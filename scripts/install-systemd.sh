@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 
-# Instala el servicio systemd de LICS.
+# Instala el servicio systemd de SIGEDA.
 #
 # Este script:
 # - valida que se ejecute en Linux con systemd;
-# - valida que el proyecto esté instalado en /opt/lics;
-# - instala la unidad lics.service;
+# - valida que el proyecto esté instalado en /opt/sigeda;
+# - instala la unidad sigeda.service;
 # - recarga systemd;
 # - habilita el arranque automático.
 #
@@ -18,8 +18,8 @@
 
 set -Eeuo pipefail
 
-SERVICE_NAME="lics.service"
-PROJECT_DIR="/opt/lics"
+SERVICE_NAME="sigeda.service"
+PROJECT_DIR="/opt/sigeda"
 SOURCE_SERVICE_FILE="${PROJECT_DIR}/infra/systemd/${SERVICE_NAME}"
 TARGET_SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}"
 

@@ -23,7 +23,68 @@ El formato utiliza estas categorías:
 
 ## [No liberado]
 
-Nada pendiente de registrar.
+> 23/11/2026: confirmado el despliegue de producción (laptop Windows de la
+> ASADA) y cerrado el renombrado lics→sigeda del instalador y la
+> infraestructura. Los Incrementos 2 a 4 (13/11/2026) no habían quedado
+> registrados aquí todavía — ver `docs/evidencia/` para el detalle y la
+> evidencia real de cada uno.
+
+### Added
+
+- Incrementos 2 a 4 completos (13/11/2026): sesión y cuentas (PAN-01,
+  PAN-14, RNF-09), expediente completo (PAN-02, PAN-04, PAN-06, PAN-13) con
+  sus diálogos, abonado y personas, respaldo y restauración cifrados
+  (PAN-08, D-05), importación de SADA (PAN-09), tipos de documento (PAN-10,
+  CRUD real), completitud a fondo (PAN-07), bitácora (PAN-11), exportación
+  (PAN-12). 252 pruebas automáticas en verde, 0 infracciones de
+  accesibilidad.
+
+### Changed
+
+- Renombrado lics→sigeda (23/11/2026) de todo `infra/`, `scripts/` y
+  `.github/workflows/`: Electron (`package.json`, canales IPC, tareas
+  programadas de Windows, instalador NSIS), systemd, `compose.prod.yml` /
+  `.env.prod.example` (incluida la falta de los volúmenes de documentos
+  cifrados/respaldos/exportaciones, que se agregó), el workflow de
+  GitHub Actions (`SIGEDA-Setup`, runner `sigeda-windows`).
+
+### Fixed
+
+- `infra/systemd/sigeda-backup.service` disparaba el `scripts/backup.sh`
+  viejo de LICS (`pg_dump` sin cifrar, sin el volumen de documentos),
+  nunca conectado al mecanismo real que SIGEDA construyó en el
+  Incremento 3a (`apps/respaldos`, cifrado AES-256-GCM, verificado con
+  SHA-256). Ahora dispara `manage.py respaldar automatico`. De haberse
+  instalado tal cual estaba, el respaldo diario automático de producción
+  habría sido el incorrecto.
+
+### Removed
+
+- `infra/windows-demo/` (histórico, ya marcado como no usado en ningún
+  lado por su propio README).
+- Modo kiosco, descartado desde el diseño real de `infra/windows/`:
+  `infra/systemd/lics-kiosk.service`, `scripts/start-kiosk.sh`,
+  `scripts/install-kiosk.sh`, `scripts/install-autologin-gdm.sh`,
+  `scripts/install-workstation.sh`, `scripts/install-desktop-user.sh`,
+  `scripts/wait-for-sigeda.sh` (antes `wait-for-lics.sh`, solo se usaba
+  para esperar antes de abrir el kiosco Chromium).
+- El universo viejo de respaldo/restauración en bash, reemplazado por
+  `apps/respaldos`: `scripts/backup.sh`, `scripts/restore.sh`,
+  `scripts/test-restore.sh`, `scripts/verify-backup.sh`,
+  `scripts/cleanup-backups.sh`. `scripts/rollback.sh` se conserva (revierte
+  una actualización de código fallida, no el respaldo del archivo
+  documental): su resguardo pre-rollback ahora llama al mecanismo real en
+  vez del `backup.sh` retirado, y `scripts/update.sh` genera su propio
+  respaldo pre-actualización inline (mismo formato que ya esperaba
+  `rollback.sh` para restaurar).
+
+### Pending
+
+- Compilar y probar el instalador de Windows contra hardware real: no se
+  puede desde un entorno Linux/WSL2 de desarrollo.
+- Volver a registrar el runner self-hosted de GitHub Actions con el label
+  `sigeda-windows` (antes `lics-windows`) — acción manual en la máquina
+  física.
 
 ---
 
@@ -68,13 +129,10 @@ Nada pendiente de registrar.
 
 ### Pending
 
-- Renombrar «lics» → «sigeda» en `infra/docker/compose.prod.yml`,
-  `scripts/` e `infra/windows`/`infra/systemd` (conservados intactos como
-  referencia): se deja para cuando se decida el despliegue de producción
-  de SIGEDA.
-- Incrementos 2 a 4 (sesión y cuentas, expediente completo, respaldo y
-  restauración, importación de SADA, tipos de documento, completitud,
-  bitácora, exportación) — ver CLAUDE.md, sección 9.
+- Ver «[No liberado]» arriba: Incrementos 2 a 4 y el renombrado
+  lics→sigeda del instalador ya se cerraron (13/11/2026 y 23/11/2026).
+  Queda compilar/probar el instalador en hardware Windows real y las
+  preguntas abiertas con la administradora (CLAUDE.md, sección 9).
 
 ---
 

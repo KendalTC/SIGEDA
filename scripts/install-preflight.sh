@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# Evalúa si una computadora Linux está preparada para instalar LICS.
+# Evalúa si una computadora Linux está preparada para instalar SIGEDA.
 #
 # Este script no instala, copia ni modifica nada.
 #
@@ -23,9 +23,9 @@
 #
 # Variables opcionales:
 #
-#   LICS_MIN_RAM_MB=4096
-#   LICS_MIN_DISK_MB=20480
-#   LICS_RELEASE_IMAGES_DIR=/ruta/a/images
+#   SIGEDA_MIN_RAM_MB=4096
+#   SIGEDA_MIN_DISK_MB=20480
+#   SIGEDA_RELEASE_IMAGES_DIR=/ruta/a/images
 
 set -Eeuo pipefail
 
@@ -35,16 +35,16 @@ PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 readonly SCRIPT_DIR
 readonly PROJECT_ROOT
 
-MIN_RAM_MB="${LICS_MIN_RAM_MB:-4096}"
-MIN_DISK_MB="${LICS_MIN_DISK_MB:-20480}"
-if [[ -n "${LICS_RELEASE_IMAGES_DIR:-}" ]]; then
-    RELEASE_IMAGES_DIR="${LICS_RELEASE_IMAGES_DIR}"
+MIN_RAM_MB="${SIGEDA_MIN_RAM_MB:-4096}"
+MIN_DISK_MB="${SIGEDA_MIN_DISK_MB:-20480}"
+if [[ -n "${SIGEDA_RELEASE_IMAGES_DIR:-}" ]]; then
+    RELEASE_IMAGES_DIR="${SIGEDA_RELEASE_IMAGES_DIR}"
 elif [[ -d "${PROJECT_ROOT}/../images" ]]; then
     RELEASE_IMAGES_DIR="$(cd "${PROJECT_ROOT}/../images" && pwd)"
 else
     RELEASE_IMAGES_DIR="${PROJECT_ROOT}/release/images"
 fi
-DISK_CHECK_PATH="${LICS_DISK_CHECK_PATH:-${PROJECT_ROOT}}"
+DISK_CHECK_PATH="${SIGEDA_DISK_CHECK_PATH:-${PROJECT_ROOT}}"
 
 readonly MIN_RAM_MB
 readonly MIN_DISK_MB
@@ -270,10 +270,7 @@ check_project_files() {
         "scripts/restart.sh"
         "scripts/status.sh"
         "scripts/healthcheck.sh"
-        "scripts/backup.sh"
-        "scripts/verify-backup.sh"
-        "scripts/test-restore.sh"
-        "scripts/restore.sh"
+        "scripts/rollback.sh"
         "scripts/lib/common.sh"
     )
 
@@ -313,8 +310,8 @@ required_image_names() {
     )"
 
     printf '%s\n' \
-        "lics-backend:${version}" \
-        "lics-frontend:${version}" \
+        "sigeda-backend:${version}" \
+        "sigeda-frontend:${version}" \
         "nginx:1.28-alpine" \
         "postgres:17-alpine"
 }
@@ -378,16 +375,16 @@ check_images() {
 }
 
 check_existing_installation() {
-    if [[ -e /opt/lics ]]; then
-        warning "Ya existe /opt/lics. Puede haber una instalación previa."
+    if [[ -e /opt/sigeda ]]; then
+        warning "Ya existe /opt/sigeda. Puede haber una instalación previa."
     else
-        ok "No se detectó una instalación previa en /opt/lics."
+        ok "No se detectó una instalación previa en /opt/sigeda."
     fi
 
-    if [[ -e /etc/systemd/system/lics.service ]]; then
-        warning "Ya existe el servicio systemd lics.service."
+    if [[ -e /etc/systemd/system/sigeda.service ]]; then
+        warning "Ya existe el servicio systemd sigeda.service."
     else
-        ok "No se detectó un servicio lics.service previo."
+        ok "No se detectó un servicio sigeda.service previo."
     fi
 }
 
@@ -400,7 +397,7 @@ print_summary() {
     printf '\n'
 
     if (( FAILURES > 0 )); then
-        printf '[FALLO] La computadora no está lista para instalar LICS.\n' >&2
+        printf '[FALLO] La computadora no está lista para instalar SIGEDA.\n' >&2
         return 1
     fi
 
@@ -410,11 +407,11 @@ print_summary() {
         return 0
     fi
 
-    printf '[OK] La computadora está lista para instalar LICS.\n'
+    printf '[OK] La computadora está lista para instalar SIGEDA.\n'
 }
 
 main() {
-    printf 'Preinstalación de LICS\n'
+    printf 'Preinstalación de SIGEDA\n'
     printf '======================\n'
     printf 'Proyecto: %s\n' "${PROJECT_ROOT}"
     printf 'Imágenes: %s\n' "${RELEASE_IMAGES_DIR}"

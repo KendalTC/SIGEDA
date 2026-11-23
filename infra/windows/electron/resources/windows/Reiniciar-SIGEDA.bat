@@ -1,18 +1,18 @@
 @echo off
-title LICS - Reiniciar servicios
+title SIGEDA - Reiniciar servicios
 setlocal
 
-set DISTRO=lics-wsl
-set TAREA_SESION=LICS - Mantener sesion WSL activa
-set TAREA_BACKEND=LICS - Iniciar backend
+set DISTRO=sigeda-wsl
+set TAREA_SESION=SIGEDA - Mantener sesion WSL activa
+set TAREA_BACKEND=SIGEDA - Iniciar backend
 
 cls
 echo.
 echo   ==================================================
-echo    LICS - Reiniciar servicios
+echo    SIGEDA - Reiniciar servicios
 echo   ==================================================
 echo.
-echo   Use esto solo si LICS no abre, se queda en
+echo   Use esto solo si SIGEDA no abre, se queda en
 echo   "Iniciando..." o avisa que no se puede comunicar
 echo   con el sistema local.
 echo.
@@ -34,7 +34,7 @@ if errorlevel 1 (
 )
 
 echo.
-echo   [2 de 4] Levantando los servicios de LICS...
+echo   [2 de 4] Levantando los servicios de SIGEDA...
 schtasks /Run /TN "%TAREA_BACKEND%" >nul 2>&1
 if errorlevel 1 (
     echo            AVISO: la tarea no respondio. Se continua igual.
@@ -48,7 +48,7 @@ set /a INTENTO=0
 
 :esperar
 set /a INTENTO+=1
-wsl -d %DISTRO% -- /opt/lics/scripts/healthcheck.sh >nul 2>&1
+wsl -d %DISTRO% -- /opt/sigeda/scripts/healthcheck.sh >nul 2>&1
 if not errorlevel 1 goto listo
 if %INTENTO% GEQ 12 goto con_problema
 echo            intento %INTENTO% de 12, esperando...
@@ -61,11 +61,11 @@ echo            OK
 echo.
 echo   [4 de 4] Estado final:
 echo.
-wsl -d %DISTRO% -- /opt/lics/scripts/healthcheck.sh
+wsl -d %DISTRO% -- /opt/sigeda/scripts/healthcheck.sh
 
 echo.
 echo   ==================================================
-echo    TERMINADO. Ya puede abrir LICS normalmente.
+echo    TERMINADO. Ya puede abrir SIGEDA normalmente.
 echo   ==================================================
 echo.
 pause
@@ -79,17 +79,17 @@ echo   ==================================================
 echo.
 echo   Detalle del ultimo intento:
 echo.
-wsl -d %DISTRO% -- /opt/lics/scripts/healthcheck.sh
+wsl -d %DISTRO% -- /opt/sigeda/scripts/healthcheck.sh
 echo.
 echo   Que hacer ahora:
 echo.
 echo   1. Cierre esta ventana, haga clic derecho sobre el
-echo      icono "Reiniciar LICS" y elija
+echo      icono "Reiniciar SIGEDA" y elija
 echo      "Ejecutar como administrador". Pruebe otra vez.
 echo.
 echo   2. Si vuelve a fallar, saque una foto de esta
 echo      ventana completa y enviesela a soporte tecnico.
-echo      NO reinstale LICS.
+echo      NO reinstale SIGEDA.
 echo.
 pause
 exit /b 1

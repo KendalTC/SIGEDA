@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 
-# Revierte LICS a una instalación anterior usando un respaldo pre-update.
+# Revierte SIGEDA a una instalación anterior usando un respaldo pre-update.
 #
 # Uso:
 #
-#   sudo ./scripts/rollback.sh /opt/lics.previous.<timestamp> /opt/lics/backups/<backup-pre-update>
+#   sudo ./scripts/rollback.sh /opt/sigeda.previous.<timestamp> /opt/sigeda/backups/<backup-pre-update>
 #
 # Este script:
 # - valida la instalación actual;
@@ -138,8 +138,8 @@ validate_installations() {
     require_file "${CURRENT_INSTALL_ROOT}/infra/docker/.env.prod"
     require_file "${PREVIOUS_INSTALLATION}/infra/docker/.env.prod"
 
-    if [[ ! -x "${CURRENT_INSTALL_ROOT}/scripts/backup.sh" ]]; then
-        die "No existe backup.sh ejecutable en la instalación actual."
+    if [[ ! -f "${CURRENT_INSTALL_ROOT}/infra/docker/compose.prod.yml" ]]; then
+        die "No existe ${CURRENT_INSTALL_ROOT}/infra/docker/compose.prod.yml."
     fi
 
     if [[ ! -x "${CURRENT_INSTALL_ROOT}/scripts/stop.sh" ]]; then
@@ -157,13 +157,13 @@ validate_installations() {
 
 load_versions() {
     CURRENT_VERSION="$(installed_version)"
-    PREVIOUS_VERSION="$(env_value_from_file "${PREVIOUS_INSTALLATION}/infra/docker/.env.prod" LICS_VERSION)"
+    PREVIOUS_VERSION="$(env_value_from_file "${PREVIOUS_INSTALLATION}/infra/docker/.env.prod" SIGEDA_VERSION)"
     BACKUP_VERSION="$(metadata_value application_version)"
     DATABASE_NAME="$(metadata_value database_name)"
     DATABASE_USER="$(metadata_value database_user)"
 
     if [[ -z "${PREVIOUS_VERSION}" ]]; then
-        die "No se pudo leer LICS_VERSION de la instalación anterior."
+        die "No se pudo leer SIGEDA_VERSION de la instalación anterior."
     fi
 
     if [[ -z "${BACKUP_VERSION}" ]]; then
@@ -240,9 +240,14 @@ request_confirmation() {
 create_safety_backup() {
     log_info "Creando respaldo preventivo del estado actual..."
 
-    "${CURRENT_INSTALL_ROOT}/scripts/backup.sh" pre-restore
+    (
+        cd "${CURRENT_INSTALL_ROOT}" \
+            && docker compose -f infra/docker/compose.prod.yml exec -T backend \
+                python src/manage.py respaldar manual
+    )
 
-    log_ok "Respaldo preventivo creado."
+    log_ok "Respaldo preventivo creado (apps/respaldos, RF-16/ADR-03: base + \
+almacén de documentos, cifrado, verificado con SHA-256)."
 }
 
 stop_current_application() {
@@ -442,11 +447,11 @@ print_result() {
     printf 'Instalación fallida:         %s\n' "${FAILED_INSTALL_ROOT}"
     printf 'Respaldo usado:              %s\n' "${ROLLBACK_BACKUP}"
     printf '\n'
-    printf '[OK] LICS quedó restaurado y saludable.\n'
+    printf '[OK] SIGEDA quedó restaurado y saludable.\n'
 }
 
 main() {
-    printf 'Rollback productivo de LICS\n'
+    printf 'Rollback productivo de SIGEDA\n'
     printf '===========================\n'
 
     require_root
