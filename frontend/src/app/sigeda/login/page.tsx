@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,113 @@ import { useSigedaAuth, type Sesion } from "@/features/sigeda/auth-context";
 
 const MENSAJE_CONTRASENAS_DISTINTAS =
   "Las contraseñas no coinciden. Vuelva a escribirlas iguales.";
+
+/**
+ * Pantalla partida de PAN-01 (rediseño del 23/11/2026, aprobado con
+ * Kendal sobre prototipos): un panel de marca a la izquierda (se
+ * oculta en pantallas angostas) y la tarjeta del formulario a la
+ * derecha. Comparte las manchas animadas (`.sigeda-orb`) y la entrada
+ * suave (`.sigeda-aparecer`) con la barra lateral del resto de la
+ * aplicación, para que el cambio de una pantalla a otra se sienta
+ * continuo.
+ */
+function PantallaAutenticacion({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex min-h-dvh w-full flex-wrap">
+      <aside
+        aria-label="Acueducto Bodegas y Pilas, SIGEDA"
+        className="relative flex min-h-dvh min-w-[340px] flex-[1_1_440px] flex-col items-center justify-center overflow-hidden p-[60px] text-white max-[780px]:hidden"
+        style={{
+          background:
+            "linear-gradient(155deg, var(--color-primary) 0%, var(--color-primary-active) 100%)",
+        }}
+      >
+        <span
+          className="sigeda-orb"
+          style={{
+            width: 420,
+            height: 420,
+            top: -130,
+            right: -110,
+            opacity: 0.65,
+            background: "radial-gradient(circle at 30% 30%, #55AEDC, transparent 70%)",
+            animationDuration: "17s",
+          }}
+        />
+        <span
+          className="sigeda-orb"
+          style={{
+            width: 320,
+            height: 320,
+            bottom: -110,
+            left: -90,
+            opacity: 0.55,
+            background: "radial-gradient(circle at 50% 50%, #7DC6EA, transparent 70%)",
+            animationDuration: "21s",
+            animationDelay: "-5s",
+          }}
+        />
+        <span
+          className="sigeda-orb"
+          style={{
+            width: 220,
+            height: 220,
+            top: "38%",
+            left: "8%",
+            opacity: 0.1,
+            background: "radial-gradient(circle at 50% 50%, #ffffff, transparent 70%)",
+            animationDuration: "13s",
+            animationDelay: "-2s",
+          }}
+        />
+
+        <div
+          className="sigeda-aparecer relative flex flex-col items-center gap-[18px] text-center"
+          style={{ fontFamily: "var(--font-brand)" }}
+        >
+          <span className="text-[12.5px] font-semibold uppercase tracking-[0.16em] opacity-70">
+            Acueducto Bodegas y Pilas
+          </span>
+          <span className="text-[68px] font-semibold leading-none tracking-[-0.025em]">
+            SIGEDA
+          </span>
+          <span className="mt-1 h-[3px] w-10 rounded-full bg-white/40" />
+        </div>
+      </aside>
+
+      <div className="relative flex min-w-[320px] flex-[2_1_480px] items-center justify-center overflow-hidden p-6 sm:p-10">
+        <span
+          className="sigeda-orb"
+          style={{
+            width: 360,
+            height: 360,
+            top: -120,
+            right: -80,
+            opacity: 0.5,
+            background: "radial-gradient(circle at 50% 50%, #BFE0F0, transparent 70%)",
+            filter: "blur(60px)",
+            animationDuration: "19s",
+          }}
+        />
+        <span
+          className="sigeda-orb"
+          style={{
+            width: 260,
+            height: 260,
+            bottom: -80,
+            left: "10%",
+            opacity: 0.4,
+            background: "radial-gradient(circle at 50% 50%, #CFE8D9, transparent 70%)",
+            filter: "blur(60px)",
+            animationDuration: "23s",
+            animationDelay: "-6s",
+          }}
+        />
+        {children}
+      </div>
+    </div>
+  );
+}
 
 export default function SigedaLoginPage() {
   const router = useRouter();
@@ -120,15 +227,9 @@ export default function SigedaLoginPage() {
 
   if (sesionPendienteDeContrasena) {
     return (
-      <main className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center gap-6 px-4">
-        <div>
-          <h1>SIGEDA</h1>
-          <p className="text-[var(--color-text-muted)]">
-            Acueducto Bodegas y Pilas
-          </p>
-        </div>
-
-        <h2>Cree su contraseña</h2>
+      <PantallaAutenticacion>
+      <main className="sigeda-aparecer relative w-full max-w-[400px] rounded-[var(--radius-lg)] border border-[var(--color-border-soft)] bg-surface p-10 shadow-[var(--shadow-lg)]">
+        <h2 className="mt-0">Cree su contraseña</h2>
         <p className="text-[var(--color-text-muted)]">
           Ingresó con una contraseña temporal asignada desde la otra cuenta.
           Antes de continuar, cree una propia.
@@ -190,15 +291,17 @@ export default function SigedaLoginPage() {
           </Button>
         </form>
       </main>
+      </PantallaAutenticacion>
     );
   }
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center gap-6 px-4">
-      <div>
-        <h1>SIGEDA</h1>
+    <PantallaAutenticacion>
+    <main className="sigeda-aparecer relative w-full max-w-[400px] rounded-[var(--radius-lg)] border border-[var(--color-border-soft)] bg-surface p-10 shadow-[var(--shadow-lg)]">
+      <div className="mb-2">
+        <h1 className="mt-0 mb-1">Iniciar sesión</h1>
         <p className="text-[var(--color-text-muted)]">
-          Acueducto Bodegas y Pilas
+          Escriba su usuario y contraseña.
         </p>
       </div>
 
@@ -255,5 +358,6 @@ export default function SigedaLoginPage() {
         </p>
       </form>
     </main>
+    </PantallaAutenticacion>
   );
 }
