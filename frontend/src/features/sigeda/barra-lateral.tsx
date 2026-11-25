@@ -37,6 +37,18 @@ const GRUPOS: GrupoNav[] = [
         ),
       },
       {
+        href: "/sigeda/abonados/nuevo",
+        etiqueta: "Nuevo abonado",
+        icono: (
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2" />
+            <circle cx="9" cy="7" r="4" />
+            <path d="M19 8v6" />
+            <path d="M22 11h-6" />
+          </svg>
+        ),
+      },
+      {
         href: "/sigeda/abonados/importar",
         etiqueta: "Importar listado de SADA",
         icono: (

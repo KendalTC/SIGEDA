@@ -141,6 +141,14 @@ generate_env_file() {
     sed -i "s|^SIGEDA_VERSION=.*|SIGEDA_VERSION=${version}|" "${env_file}"
     sed -i "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=$(openssl rand -hex 32)|" "${env_file}"
     sed -i "s|^DJANGO_SECRET_KEY=.*|DJANGO_SECRET_KEY=$(openssl rand -hex 32)|" "${env_file}"
+    # RNF-13: clave AES-256 (32 bytes) en base64 para el almacén de
+    # documentos cifrados (ServicioCifrado._clave_desde_configuracion()
+    # espera exactamente eso). Agregada al archivo de ejemplo el
+    # 23/11/2026 (RF-18/RF-16) sin actualizar este generador en el mismo
+    # cambio -- encontrado el 24/11/2026 en una instalación real: el
+    # resto del script seguía su curso con un REEMPLAZAR_ sin sustituir
+    # hasta que start.sh lo rechazaba recién al validar el entorno.
+    sed -i "s|^DOCUMENT_ENCRYPTION_KEY_B64=.*|DOCUMENT_ENCRYPTION_KEY_B64=$(openssl rand -base64 32)|" "${env_file}"
 
     chmod 600 "${env_file}"
 

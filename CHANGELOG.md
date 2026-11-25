@@ -28,6 +28,13 @@ El formato utiliza estas categorías:
 > infraestructura. Los Incrementos 2 a 4 (13/11/2026) no habían quedado
 > registrados aquí todavía — ver `docs/evidencia/` para el detalle y la
 > evidencia real de cada uno.
+>
+> 24/11/2026: rediseño visual completo del frontend (login, barra lateral,
+> las 17 pantallas), y **primera prueba real end-to-end del instalador de
+> Windows** sobre el hardware de Kendal (imagen dorada, runner self-hosted,
+> `.exe` compilado e instalado). Encontró varios problemas reales —
+> detallados abajo — ya corregidos donde fue simple, anotados como
+> pendientes donde no.
 
 ### Added
 
@@ -38,6 +45,21 @@ El formato utiliza estas categorías:
   CRUD real), completitud a fondo (PAN-07), bitácora (PAN-11), exportación
   (PAN-12). 252 pruebas automáticas en verde, 0 infracciones de
   accesibilidad.
+
+### Added
+
+- Enlace fijo "Nuevo abonado" (PAN-06) en el grupo "Expediente" de la
+  barra lateral. Antes solo se llegaba a través del aviso de "sin
+  resultados" al buscar una paja inexistente — el mapa de navegación
+  oficial del prototipo (`pantallas.json`, sección "NAV") ya marcaba
+  "Nuevo abonado" como enlace global (`*`) desde el Incremento 2a
+  (13/11/2026); nunca se había implementado así. Confirmado con el
+  historial de git que el rediseño visual del 24/11/2026 no le quitó
+  nada: la barra anterior ya tenía esta misma carencia.
+- Rediseño visual del frontend (24/11/2026): login de pantalla dividida,
+  barra lateral agrupada, botones y tarjetas más espaciados en las 17
+  pantallas, sin cambiar ninguna regla de negocio. 0 infracciones de
+  accesibilidad (axe-core) mantenidas.
 
 ### Changed
 
@@ -57,6 +79,11 @@ El formato utiliza estas categorías:
   SHA-256). Ahora dispara `manage.py respaldar automatico`. De haberse
   instalado tal cual estaba, el respaldo diario automático de producción
   habría sido el incorrecto.
+- `provision-golden-image.sh` generaba `.env.prod` sin sustituir
+  `DOCUMENT_ENCRYPTION_KEY_B64` (el generador no se había actualizado
+  cuando esa variable se agregó el 23/11/2026) — encontrado el
+  24/11/2026 en la primera instalación real, cuando `start.sh` lo
+  rechazó recién al validar el entorno.
 
 ### Removed
 
@@ -78,13 +105,54 @@ El formato utiliza estas categorías:
   respaldo pre-actualización inline (mismo formato que ya esperaba
   `rollback.sh` para restaurar).
 
+### Validated
+
+- Instalador de Windows probado de punta a punta por primera vez
+  (24/11/2026), contra hardware real: build offline → imagen dorada →
+  runner self-hosted (`sigeda-windows`, ya registrado) → `.exe`
+  compilado por GitHub Actions → instalado → app real de SIGEDA
+  alcanzada y usable (login, completitud, buscar expediente). Evidencia
+  real, no simulada; ver detalle de lo encontrado en "Pending" abajo.
+
 ### Pending
 
-- Compilar y probar el instalador de Windows contra hardware real: no se
-  puede desde un entorno Linux/WSL2 de desarrollo.
+- **`infra/windows/electron/main.js` carga la URL equivocada**
+  (`http://127.0.0.1/` en vez de `/sigeda/login` o `/sigeda/`): lleva a
+  la pantalla genérica que quedó de la base LICS (`src/app/page.tsx`,
+  `/account`, `/system/status`, con módulos "Inventario"/"Ventas" que no
+  aplican a SIGEDA), nunca a la app real bajo `/sigeda/`. Arreglo simple
+  en el código, pero exige recompilar y volver a probar el `.exe` para
+  confirmarlo.
+- **Ninguna cuenta real (`secretaria`/`administracion`) se crea en una
+  instalación limpia** — `provision-golden-image.sh` solo corre
+  `migrate`, `setup_roles` (roles genéricos de LICS, ya no aplican del
+  todo) y `createsuperuser` (un superusuario genérico de Django, no una
+  fila de `cuenta`). Falta decidir cómo la ASADA crea su primera cuenta
+  real en una instalación de producción.
+- La contraseña de Postgres puede desincronizarse de `.env.prod` si el
+  archivo se regenera (p. ej. se borra a mano) después de que el volumen
+  de Postgres ya quedó inicializado con una contraseña anterior —
+  encontrado hoy tras varias corridas de `provision-golden-image.sh`
+  durante la misma prueba. Si vuelve a pasar, se corrige con
+  `ALTER USER sigeda WITH PASSWORD '...'` usando el valor real de
+  `.env.prod`, sin perder datos.
+- La red interna de Docker (el puente entre contenedores) se puede
+  quedar en mal estado dentro de la distro WSL2 — todas las conexiones
+  entre contenedores (incluida la del propio healthcheck) empiezan a
+  fallar con "upstream timed out"/"connection timeout" aunque cada
+  contenedor se vea sano por separado. Se corrige con
+  `sudo systemctl restart docker` dentro de la distro (`sigeda-wsl` en
+  producción). Pasó dos veces hoy, en dos distros WSL2 distintas de la
+  misma laptop — vale la pena anotarlo en `infra/windows/README.md`
+  como paso de troubleshooting si se repite en la ASADA.
+- **PAN-02 "Inicio"**: nunca se construyó como pantalla propia (decisión
+  ya pendiente desde el Incremento 2a, no es nuevo de hoy) — quien
+  inicia sesión va directo a "Buscar expediente". El mapa de navegación
+  del prototipo la marca como destino global. Falta decidir qué debería
+  mostrar antes de construirla.
 - Volver a registrar el runner self-hosted de GitHub Actions con el label
-  `sigeda-windows` (antes `lics-windows`) — acción manual en la máquina
-  física.
+  `sigeda-windows` si se usa en otra máquina — hoy ya se registró y
+  probó con éxito en la laptop de Kendal.
 
 ---
 
